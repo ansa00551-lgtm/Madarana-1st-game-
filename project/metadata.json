@@ -1,0 +1,6 @@
+{
+  "name": "محلل توافق العتاد للألعاب",
+  "description": "محلل ذكي فوري لفحص توافق الكمبيوتر وأجهزة الكونسول والجوال مع أحدث الألعاب العالمية بدعم الذكاء الاصطناعي وقاعدة بيانات RAWG.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

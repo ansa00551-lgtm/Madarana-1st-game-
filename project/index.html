@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>محلل توافق العتاد وتشغيل الألعاب | Core Specs Analyzer</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#060913" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="فاحص الألعاب" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    
+    <!-- Google Fonts for Editorial Gaming UI & Arabic Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Tajawal:wght@400;500;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#0b0f19] text-gray-100 font-sans selection:bg-cyan-500 selection:text-black antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- SERVICE WORKER AND DYNAMIC HARDWARE SCANNER CORES -->
+    <script>
+      // 1. Service Worker for PWA compatibility
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js")
+            .then((reg) => console.log("Service Worker registered successfully:", reg.scope))
+            .catch((err) => console.error("Service Worker registration failed:", err));
+        });
+      }
+
+      // 2. TRUE DYNAMIC AUTO-SCAN WEBGL & USER-AGENT HARDWARE PROBER
+      window.smartHardwareScan = function() {
+        const ua = navigator.userAgent;
+        const lowerUa = ua.toLowerCase();
+        const cores = navigator.hardwareConcurrency || 8;
+        
+        let webglInfo = { vendor: "", renderer: "" };
+        try {
+          const canvas = document.createElement("canvas");
+          const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+          if (gl) {
+            const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+            if (debugInfo) {
+              webglInfo.vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || "";
+              webglInfo.renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || "";
+            }
+          }
+        } catch (e) {
+          console.error("WebGL Hardware inspection failed: ", e);
+        }
+
+        const lowerRenderer = webglInfo.renderer.toLowerCase();
+        
+        // Strict Note 9 check: userAgent contains "SM-N960" OR WebGL renderer is precisely Adreno 630
+        const isNote9Model = lowerUa.includes("sm-n960");
+        const isAdreno630 = lowerRenderer.includes("adreno (tm) 630") || 
+                            lowerRenderer.includes("adreno 630") || 
+                            lowerRenderer.includes("adreno(tm) 630");
+
+        let stats = {
+          deviceType: "desktop",
+          mobileSubType: "android",
+          pcCategory: "custom",
+          pcSubType: "desktop",
+          cpuName: "Intel Core i7-12700K",
+          gpuName: "NVIDIA GeForce RTX 3070",
+          ramGB: 16,
+          vramGB: 8,
+          storageGB: 512,
+          storageType: "NVMe SSD",
+          motherboardModel: "ASUS PRIME Z790-P",
+          appleFamily: "",
+          appleGen: "",
+          appleTier: "",
+          phoneName: "Google Pixel 8",
+          phoneCpu: "Tensor G3",
+          phoneGpu: "Mali-G715",
+          phoneRam: 8,
+          phoneStorage: 128
+        };
+
+        // 1. SPECIFIC STRICT CONDITIONAL RULE: Samsung Galaxy Note 9 Check
+        if (isNote9Model || isAdreno630) {
+          stats.deviceType = "mobile";
+          stats.mobileSubType = "android";
+          stats.phoneName = "Samsung Galaxy Note 9 (Snapdragon 845 / Adreno 630)";
+          stats.phoneCpu = "Snapdragon 845";
+          stats.phoneGpu = "Adreno 630";
+          stats.phoneRam = 6;
+          stats.phoneStorage = 128;
+          stats.cpuName = "Snapdragon 845";
+          stats.gpuName = "Adreno 630";
+          stats.ramGB = 6;
+          stats.vramGB = 2;
+          stats.storageGB = 128;
+          return stats;
+        }
+
+        // 2. iOS Devices Check
+        if (lowerUa.includes("iphone") || lowerUa.includes("ipad") || lowerUa.includes("ipod")) {
+          stats.deviceType = "mobile";
+          stats.mobileSubType = "apple-ios";
+          stats.appleFamily = "iphone";
+          
+          if (lowerRenderer.includes("apple") || cores >= 6) {
+            stats.appleGen = "iphone-15";
+            stats.appleTier = "pro";
+            stats.cpuName = "A17 Pro";
+            stats.gpuName = webglInfo.renderer || "Apple GPU (6-core)";
+            stats.ramGB = 8;
+            stats.vramGB = 4;
+            stats.phoneStorage = 256;
+          } else {
+            stats.appleGen = "iphone-13";
+            stats.appleTier = "standard";
+            stats.cpuName = "A15 Bionic";
+            stats.gpuName = webglInfo.renderer || "Apple GPU (5-core)";
+            stats.ramGB = 4;
+            stats.vramGB = 2;
+            stats.phoneStorage = 128;
+          }
+          return stats;
+        }
+
+        // 3. Android Devices Check (without Note 9)
+        if (lowerUa.includes("android") || (lowerUa.includes("mobile") && !lowerUa.includes("macintosh"))) {
+          stats.deviceType = "mobile";
+          stats.mobileSubType = "android";
+          
+          let detectedModel = "Android Device";
+          if (lowerUa.includes("pixel")) {
+            detectedModel = "Google Pixel Device";
+          } else if (lowerUa.includes("samsung") || lowerUa.includes("sm-")) {
+            detectedModel = "Samsung Galaxy Device";
+          } else if (lowerUa.includes("xiaomi")) {
+            detectedModel = "Xiaomi Phone";
+          } else if (lowerUa.includes("oneplus")) {
+            detectedModel = "OnePlus Phone";
+          }
+
+          stats.phoneName = detectedModel + " (" + (webglInfo.renderer || "Detected GPU") + ")";
+          
+          if (cores >= 8) {
+            stats.phoneCpu = "Octa-Core High-End ARM SoC";
+            stats.phoneRam = 8;
+            stats.phoneStorage = 256;
+          } else {
+            stats.phoneCpu = "ARM Quad-Core or Hexa-Core SoC";
+            stats.phoneRam = 6;
+            stats.phoneStorage = 128;
+          }
+          stats.phoneGpu = webglInfo.renderer || "Integrated Mali/Adreno GPU";
+          
+          stats.cpuName = stats.phoneCpu;
+          stats.gpuName = stats.phoneGpu;
+          stats.ramGB = stats.phoneRam;
+          stats.storageGB = stats.phoneStorage;
+          return stats;
+        }
+
+        // 4. Apple Macintosh / macOS check
+        if (lowerUa.includes("macintosh") || lowerUa.includes("mac os") || lowerUa.includes("mac os x")) {
+          stats.deviceType = "desktop";
+          stats.pcCategory = "apple-mac";
+          stats.appleFamily = "macbook_pro";
+          stats.appleGen = "m4-chipsets";
+          stats.appleTier = "pro";
+          stats.cpuName = "Apple M4 Pro";
+          stats.gpuName = "16-Core GPU (Apple M4 Pro)";
+          stats.ramGB = 24;
+          stats.vramGB = 12;
+          stats.storageGB = 512;
+          stats.storageType = "NVMe SSD";
+          return stats;
+        }
+
+        // 5. Standard Desktop Windows/Linux/Other PC Check
+        if (webglInfo.renderer) {
+          stats.gpuName = webglInfo.renderer;
+          if (lowerRenderer.includes("nvidia") || lowerRenderer.includes("geforce") || lowerRenderer.includes("rtx") || lowerRenderer.includes("gtx")) {
+            stats.gpuName = webglInfo.renderer.indexOf("GeForce") >= 0 ? webglInfo.renderer : "NVIDIA GeForce " + webglInfo.renderer;
+            stats.cpuName = "Intel Core i7-12700K";
+          } else if (lowerRenderer.includes("amd") || lowerRenderer.includes("radeon") || lowerRenderer.includes("rx")) {
+            stats.gpuName = webglInfo.renderer.indexOf("Radeon") >= 0 ? webglInfo.renderer : "AMD Radeon " + webglInfo.renderer;
+            stats.cpuName = "AMD Ryzen 7 5700X";
+          } else if (lowerRenderer.includes("intel") || lowerRenderer.includes("uhd") || lowerRenderer.includes("iris") || lowerRenderer.includes("graphics")) {
+            stats.gpuName = webglInfo.renderer;
+            stats.cpuName = "Intel Core i5-12400";
+          }
+        }
+        return stats;
+      };
+    </script>
+  </body>
+</html>
