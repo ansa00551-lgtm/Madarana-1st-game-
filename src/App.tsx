@@ -1,3 +1,4 @@
+import { getGameData, checkGamePerformance } from './api';
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
