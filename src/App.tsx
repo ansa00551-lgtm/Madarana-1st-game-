@@ -121,7 +121,7 @@ const translations = {
     verdictSuper: "✔ مهارة فائقة! تشغيل رائع ومعدل رندرة فائق التفاصيل",
     verdictSmooth: "✔ تشغيل سلس ومستقر بمستوى إطارات مقنع للغاية",
     verdictMedium: "⚠ تجربة متوسطة أو منخفضة، يرجى خفض جودة الظلال والإكساء",
-    verdictLow: "✘ دون متطلبات التشغيل الدُنيا. خلل وتجميد وتوقف مفاجئ متوقع",
+    verdictLow: "✘ دون متمتطلبات التشغيل الدُنيا. خلل وتجميد وتوقف مفاجئ متوقع",
     appleHardwareProfile: "تفاصيل القطع لنظام آبل المحدد",
     appleCpu: "المعالج والشريحة المدمجة (SoC):",
     appleRam: "الذاكرة العشوائية الموحدة (RAM):",
@@ -152,7 +152,9 @@ const translations = {
     handheldFactSheet: "ورقة حقائق الجهاز المحمول",
     smartphoneNamePlaceholder: "مثال: Galaxy S24 Ultra, Xiaomi 14 Ultra",
     smartphoneCpuPlaceholder: "Snapdragon 8 Gen 3 أو Tensor G4",
-    smartphoneGpuPlaceholder: "Adreno 750 أو AMD Xclipse 940"
+    smartphoneGpuPlaceholder: "Adreno 750 أو AMD Xclipse 940",
+    cpuPlaceholder: "مثال: Intel Core i5-12600K / Ryzen 5 5600X",
+    gpuPlaceholder: "مثال: NVIDIA RTX 3060 / Radeon RX 6700XT"
   },
   en: {
     appTitle: "Smart Hardware & Game Compatibility Analyzer",
@@ -268,7 +270,9 @@ const translations = {
     handheldFactSheet: "Handheld Specifications Fact Sheet",
     smartphoneNamePlaceholder: "e.g., Galaxy S24 Ultra, Xiaomi 14 Ultra",
     smartphoneCpuPlaceholder: "e.g., Snapdragon 8 Gen 3 or Tensor G4",
-    smartphoneGpuPlaceholder: "e.g., Adreno 750 or AMD Xclipse 940"
+    smartphoneGpuPlaceholder: "e.g., Adreno 750 or AMD Xclipse 940",
+    cpuPlaceholder: "e.g., Intel Core i5-12600K / Ryzen 5 5600X",
+    gpuPlaceholder: "e.g., NVIDIA RTX 3060 / Radeon RX 6700XT"
   }
 };
 
@@ -355,7 +359,6 @@ export default function App() {
   const [deepAnalysisRaw, setDeepAnalysisRaw] = useState("");
   const [localAnalysis, setLocalAnalysis] = useState<AnalysisResult | null>(null);
   const [historyList, setHistoryList] = useState<CachedAnalysisItem[]>([]);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Setup simulated automatic scan function
   useEffect(() => {
@@ -447,7 +450,7 @@ export default function App() {
     };
   }, []);
 
-  // Fetch trending games from RAWG proxy
+  // Fetch trending games from backend API
   useEffect(() => {
     async function loadGames() {
       try {
@@ -462,8 +465,8 @@ export default function App() {
               background_image: g.background_image || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
               released: g.released || "2023",
               genres: g.genres || [],
-              minimum_requirements: { cpu: "Intel Core i5-4460", gpu: "NVIDIA GTX 760", ram: 8, storage: 60 },
-              recommended_requirements: { cpu: "Intel Core i7-4790K", gpu: "NVIDIA GTX 1060", ram: 12, storage: 60 }
+              minimum_requirements: g.minimum_requirements || { cpu: "Intel Core i5-4460", gpu: "NVIDIA GTX 760", ram: 8, storage: 60 },
+              recommended_requirements: g.recommended_requirements || { cpu: "Intel Core i7-4790K", gpu: "NVIDIA GTX 1060", ram: 12, storage: 60 }
             }));
             setTrendingGames(parsed);
             setSelectedGame(parsed[0]);
@@ -480,7 +483,7 @@ export default function App() {
     loadGames();
   }, []);
 
-  // Debounced live search
+  // Debounced live search utilizing /api/analyze to bypass custom file missing queries
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -489,10 +492,11 @@ export default function App() {
     setIsSearchingGames(true);
     const delay = setTimeout(async () => {
       try {
-        const res = await fetch("/api/search", {
+        // We use /api/analyze as the single unified full-stack file router
+        const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gameName: searchQuery })
+          body: JSON.stringify({ type: "search_game", gameName: searchQuery })
         });
         if (res.ok) {
           const data = await res.json();
@@ -504,14 +508,14 @@ export default function App() {
               background_image: g.background_image || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
               released: g.released || "2023",
               genres: g.genres || [],
-              minimum_requirements: { cpu: "Intel Core i5-4460", gpu: "NVIDIA GTX 760", ram: 8, storage: 60 },
-              recommended_requirements: { cpu: "Intel Core i7-4790K", gpu: "NVIDIA GTX 1060", ram: 12, storage: 60 }
+              minimum_requirements: g.minimum_requirements || { cpu: "Intel Core i5-4460", gpu: "NVIDIA GTX 760", ram: 8, storage: 60 },
+              recommended_requirements: g.recommended_requirements || { cpu: "Intel Core i7-4790K", gpu: "NVIDIA GTX 1060", ram: 12, storage: 60 }
             }));
             setSearchResults(parsed);
           }
         }
       } catch (err) {
-        console.error(err);
+        console.error("Game search error:", err);
       } finally {
         setIsSearchingGames(false);
       }
@@ -655,7 +659,7 @@ export default function App() {
     else if (score >= 60) estFps = 60;
     else if (score >= 45) estFps = 40;
 
-    let recommendedResolution = "1080p - Medium settings";
+    let recommendedResolution = "1085p - Medium settings";
     if (score >= 90) recommendedResolution = "4K / Ultra Settings (DLSS/PSSR Active)";
     else if (score >= 75) recommendedResolution = "1440p - High Settings";
 
@@ -788,27 +792,17 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
       });
       if (response.ok) {
         const data = await response.json();
-        if (data.text) {
-          setDeepAnalysisRaw(data.text);
-          // cache in history
-          try {
-            const stored = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
-            if (stored) {
-              let list: CachedAnalysisItem[] = JSON.parse(stored);
-              const idx = list.findIndex(h => h.game.id === selectedGame.id);
-              if (idx !== -1) {
-                list[idx].aiReport = data.text;
-                localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(list));
-                setHistoryList(list);
-              }
-            }
-          } catch {}
+        const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (geminiText) {
+          setDeepAnalysisRaw(geminiText);
           setIsDeepAnalyzing(false);
           return;
         }
+        throw new Error("No text in response");
       }
-      throw new Error();
-    } catch {
+      throw new Error("Unable to parse API response stream");
+    } catch (err) {
+      console.warn("API Error, loading diagnostic fallback model...", err);
       // Local fallback
       const minR = selectedGame.minimum_requirements || { cpu: "Any", gpu: "Any", ram: 8, storage: 45 };
       const fallbackReport = `## Summary
@@ -1010,7 +1004,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   placeholder={t.searchPlaceholder}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 p-3.5 rounded-xl text-xs outline-none focus:border-cyan-500 text-right pr-4 pl-11"
+                  className="w-full bg-gray-950 border border-gray-800 p-3.5 rounded-xl text-xs outline-none focus:border-cyan-500 text-right pr-4 pl-11 text-gray-200"
                 />
                 <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-gray-500" />
                 {isSearchingGames && (
@@ -1033,6 +1027,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                     {searchResults.map((game) => (
                       <button
                         key={game.id}
+                        type="button"
                         onClick={() => {
                           setSelectedGame(game);
                           setSearchResults([]);
@@ -1040,7 +1035,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                         }}
                         className="w-full p-3.5 text-right flex items-center justify-between hover:bg-gray-900 transition gap-3"
                       >
-                        <ChevronRight className="w-4 h-4 text-gray-550 rotate-180" />
+                        <ChevronRight className="w-4 h-4 text-gray-500 rotate-180" />
                         <div className="flex-1">
                           <h4 className="text-xs font-bold text-gray-200">{game.name}</h4>
                           <span className="text-[10px] text-gray-500 block">{t.released}: {game.released}</span>
@@ -1059,10 +1054,11 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   {(trendingGames.length > 0 ? trendingGames : POPULAR_FALLBACK_GAMES).map((g) => (
                     <button
                       key={g.id}
+                      type="button"
                       onClick={() => setSelectedGame(g)}
                       className={`relative overflow-hidden rounded-xl h-20 text-right border transition-all hover:scale-98 cursor-pointer ${selectedGame.id === g.id ? "border-cyan-500 bg-cyan-950/15" : "border-gray-850 hover:border-gray-700"}`}
                     >
-                      <img src={g.background_image} alt="" referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-cover opacity-15" />
+                      <img src={g.background_image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] to-transparent" />
                       <span className="absolute bottom-2 left-2 right-2 text-[10px] font-extrabold text-center line-clamp-1 block z-10">{g.name}</span>
                     </button>
@@ -1099,7 +1095,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                     onClick={() => { setDeviceType("handheld"); setHandheldBrand("valve"); setHandheldModel("steam-deck-oled"); }}
                     className={`px-3 py-1.5 rounded-lg text-[10.5px] font-bold transition cursor-pointer flex items-center gap-1 ${deviceType === "handheld" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-gray-500 hover:text-gray-300"}`}
                   >
-                    <Sliders className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: "5s" }} />
+                    <Sliders className="w-3.5 h-3.5" />
                     <span>{t.handheldMode}</span>
                   </button>
                   <button
@@ -1188,7 +1184,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                           <label className="text-[10px] font-mono text-cyan-300/80">{t.overclock}</label>
                           <div className="grid grid-cols-2 gap-2 bg-gray-950 p-1.5 rounded-xl border border-gray-850">
                             <button type="button" onClick={() => setIsOverclocked(true)} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer flex items-center justify-center gap-1 ${isOverclocked ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-gray-500"}`}><Flame className="w-3.5 h-3.5" /> {t.overclockOn}</button>
-                            <button type="button" onClick={() => setIsOverclocked(false)} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${!isOverclocked ? "bg-gray-905 text-gray-400 border border-gray-800" : "text-gray-500"}`}>{t.overclockOff}</button>
+                            <button type="button" onClick={() => setIsOverclocked(false)} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${!isOverclocked ? "bg-gray-900 text-gray-400 border border-gray-805" : "text-gray-500"}`}>{t.overclockOff}</button>
                           </div>
                         </div>
                         <div className="flex flex-col gap-1.5">
@@ -1212,24 +1208,24 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.appleFamilyLabel}</label>
-                        <select value={appleFamily} onChange={(e) => handleAppleFamilyChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                          {Object.entries(APPLE_DEVICES_TREE).filter(([k]) => k !== "iphone").map(([k, f]) => (
+                        <select value={appleFamily} onChange={(e) => handleAppleFamilyChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
+                          {Object.entries(APPLE_DEVICES_TREE).filter(([k]) => k !== "iphone").map(([k, f]: [string, any]) => (
                             <option key={k} value={k}>{lang === "ar" ? f.name_ar : f.name_en}</option>
                           ))}
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.appleGenLabel}</label>
-                        <select value={appleGen} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                          {Object.entries(APPLE_DEVICES_TREE[appleFamily]?.generations || {}).map(([k, g]) => (
+                        <select value={appleGen} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
+                          {Object.entries(APPLE_DEVICES_TREE[appleFamily]?.generations || {}).map(([k, g]: [string, any]) => (
                             <option key={k} value={k}>{lang === "ar" ? g.name_ar : g.name_en}</option>
                           ))}
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.appleTierLabel}</label>
-                        <select value={appleTier} onChange={(e) => setAppleTier(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                          {Object.entries(APPLE_DEVICES_TREE[appleFamily]?.generations[appleGen]?.tiers || {}).map(([k, tier]) => (
+                        <select value={appleTier} onChange={(e) => setAppleTier(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
+                          {Object.entries(APPLE_DEVICES_TREE[appleFamily]?.generations[appleGen]?.tiers || {}).map(([k, tier]: [string, any]) => (
                             <option key={k} value={k}>{lang === "ar" ? tier.name_ar || tier.name : tier.name}</option>
                           ))}
                         </select>
@@ -1269,7 +1265,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   <div className="flex flex-col gap-1.5 animate-fade-in text-right">
                     <label className="text-[10px] font-mono text-cyan-400">{t.brandLabel}</label>
                     <select value={consoleBrand} onChange={(e) => { setConsoleBrand(e.target.value); const models = CONSOLE_MODELS[e.target.value] || []; if (models.length > 0) setConsoleModel(models[0].id); }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                      {CONSOLE_BRANDS.map(b => <option key={b.id} value={b.id}>{lang === "ar" ? b.name : b.name}</option>)}
+                      {CONSOLE_BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5 animate-fade-in text-right">
@@ -1315,7 +1311,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.appleGenLabel}</label>
                         <select value={appleGen} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                          {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations || {}).map(([k, g]) => (
+                          {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations || {}).map(([k, g]: [string, any]) => (
                             <option key={k} value={k}>{lang === "ar" ? g.name_ar : g.name_en}</option>
                           ))}
                         </select>
@@ -1323,7 +1319,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.appleTierLabel}</label>
                         <select value={appleTier} onChange={(e) => setAppleTier(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                          {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations[appleGen]?.tiers || {}).map(([k, tier]) => (
+                          {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations[appleGen]?.tiers || {}).map(([k, tier]: [string, any]) => (
                             <option key={k} value={k}>{lang === "ar" ? tier.name_ar || tier.name : tier.name}</option>
                           ))}
                         </select>
@@ -1347,7 +1343,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   )}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-mono text-cyan-400">{t.internalAllocatedStorage}</label>
-                    <select value={phoneStorage} onChange={(e) => setPhoneStorage(parseInt(e.target.value))} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                    <select value={phoneStorage} onChange={(e) => setPhoneStorage(parseInt(e.target.value))} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
                       <option value="64">64 GB Storage</option>
                       <option value="128">128 GB Storage</option>
                       <option value="256">256 GB Storage</option>
@@ -1393,7 +1389,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                         <circle cx="32" cy="32" r="28" stroke="currentColor" className="text-gray-900" strokeWidth="4" fill="none" />
                         <circle cx="32" cy="32" r="28" stroke="currentColor" className="text-cyan-500" strokeWidth="4" strokeDasharray="176" strokeDashoffset={176 - (176 * localAnalysis.overallScore) / 100} fill="none" strokeLinecap="round" />
                       </svg>
-                      <span className="absolute text-xs font-mono font-extrabold">{localAnalysis.overallScore}%</span>
+                      <span className="absolute text-xs font-mono font-extrabold text-zinc-200">{localAnalysis.overallScore}%</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="text-[9px] uppercase font-mono text-gray-500 block mb-0.5">{t.overallScore}</span>
@@ -1463,7 +1459,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="bg-gray-950 border border-cyan-500/20 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-right"
+                  className="bg-gray-950 border border-cyan-500/20 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 text-right ml-0 mr-0"
                 >
                   <div className="flex items-center justify-between border-b border-gray-900 pb-2 flex-row-reverse text-right">
                     <span className="text-[9px] font-mono tracking-wider text-pink-400 bg-pink-950/60 px-2 py-0.5 rounded border border-pink-500/25">GEMINI SYSTEM REPORT</span>
@@ -1484,7 +1480,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                         </div>
                         <div className="bg-[#060810]/70 border border-gray-850 p-4 rounded-xl">
                           <h4 className="text-indigo-400 font-mono text-[11px] font-bold uppercase mb-2 flex items-center gap-1.5 justify-end"><span className="text-gray-400">📊</span> {t.detailedMetrics}</h4>
-                          <div className="text-gray-350 text-[11px] font-mono leading-relaxed whitespace-pre-line bg-black/40 p-3 rounded-lg border border-gray-900 text-right">{parsed.detailedAnalysis}</div>
+                          <div className="text-gray-300 text-[11px] font-mono leading-relaxed whitespace-pre-line bg-black/40 p-3 rounded-lg border border-gray-900 text-right">{parsed.detailedAnalysis}</div>
                         </div>
                       </div>
                     );
@@ -1504,7 +1500,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
               <span>{t.historyTitle}</span>
             </h3>
             {historyList.length > 0 && (
-              <button onClick={clearHistory} className="px-3 py-1 bg-red-950/20 hover:bg-red-950/40 border border-red-900/30 text-rose-400 hover:text-rose-300 rounded-lg text-[10px] font-bold cursor-pointer transition">
+              <button type="button" onClick={clearHistory} className="px-3 py-1 bg-red-950/20 hover:bg-red-950/40 border border-red-900/30 text-rose-400 hover:text-rose-300 rounded-lg text-[10px] font-bold cursor-pointer transition">
                 <span>{t.clearHistoryBtn}</span>
               </button>
             )}
