@@ -784,12 +784,25 @@ STRICT RESPONSE FORMAT:
 You MUST start section names with "## Summary", "## Best Settings" and "## Detailed Analysis". Use friendly Arabic tone with English helper terms in brackets. Include specific average FPS prediction at the end.
 `;
 
+    let didTimeout = false;
+    let timeoutId: any = null;
+
     try {
+      timeoutId = setTimeout(() => {
+        didTimeout = true;
+        setDeepAnalysisRaw(`## Summary\nعذراً، انتهت مهلة الاتصال بخوادم Gemini. يرجى المحاولة مرة أخرى لاحقاً.\n## Best Settings\n-\n## Detailed Analysis\n-`);
+        setIsDeepAnalyzing(false);
+      }, 30000);
+
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt })
       });
+
+      if (timeoutId) clearTimeout(timeoutId);
+      if (didTimeout) return;
+
       if (response.ok) {
         const data = await response.json();
         const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -802,24 +815,17 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
       }
       throw new Error("Unable to parse API response stream");
     } catch (err) {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (didTimeout) return;
+
       console.warn("API Error, loading diagnostic fallback model...", err);
       // Local fallback
-      const minR = selectedGame.minimum_requirements || { cpu: "Any", gpu: "Any", ram: 8, storage: 45 };
-      const fallbackReport = `## Summary
-تم عمل محاكاة التحليل المحلي بنجاح نظراً لضغط خوادم جيميناي السحابية. جهازك مزود بمعالج (${specs.cpuName}) ومعالج رسوميات (${specs.gpuName}) وهو ما يعطي نتيجة تشغيل قوية ومستقرة للألعاب الثقيلة.
-
-## Best Settings
-- **الدقة المقترحة:** ${localAnalysis?.recommendedResolution.split(" - ")[0] || "1080p"}
-- **إعدادات الرسوم:** Medium / High (متوسطة أو عالية لقوام الإطارات)
-- **تقنيات ترقية الدقة:** تفعيل DLSS/FSR بوضعية Quality إن توفر باللعبة
-
-## Detailed Analysis
-- **معدل الإطارات التقديري المضمون:** حوالي **${localAnalysis?.estFps || 60} إطار بالثانية** متوسط أداء مريح للغاية.
-- **موقع العوائق:** عتاد مريح تماماً ومتماسك يمنع اختناقات عنق الزجاجة الشائعة.
-`;
+      const fallbackReport = `## Summary\nعذراً، تعذّر الاتصال بخوادم Gemini. ربما الخوادم مشغولة حالياً، يرجى المحاولة مرة أخرى لاحقاً.\n## Best Settings\n \n## Detailed Analysis\n `;
       setDeepAnalysisRaw(fallbackReport);
     } finally {
-      setIsDeepAnalyzing(false);
+      if (!didTimeout) {
+        setIsDeepAnalyzing(false);
+      }
     }
   };
 
@@ -1008,7 +1014,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                 />
                 <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-gray-500" />
                 {isSearchingGames && (
-                  <span className="absolute right-4 top-4 flex h-3 w-3">
+                  <span className="absolute left-14 top-4 flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
                   </span>
@@ -1017,12 +1023,12 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
 
               {/* Search Result Box Dropdown */}
               <AnimatePresence>
-                {searchResults.length > 0 && (
+                {searchQuery.trim() !== "" && searchResults.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="bg-gray-950 border border-gray-800 rounded-xl divide-y divide-gray-900 max-h-56 overflow-y-auto shadow-2xl mt-1 text-right z-30"
+                    className="bg-gray-950 border border-gray-800 rounded-xl divide-y divide-gray-900 max-h-56 overflow-y-auto shadow-2xl mt-1 text-right z-50"
                   >
                     {searchResults.map((game) => (
                       <button
@@ -1307,48 +1313,83 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   </div>
 
                   {mobileSubType === "apple-ios" ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30 text-right">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-mono text-cyan-400">{t.appleGenLabel}</label>
-                        <select value={appleGen} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                          {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations || {}).map(([k, g]: [string, any]) => (
-                            <option key={k} value={k}>{lang === "ar" ? g.name_ar : g.name_en}</option>
-                          ))}
-                        </select>
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30 text-right">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-mono text-cyan-400">{t.appleGenLabel}</label>
+                          <select value={appleGen} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                            {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations || {}).map(([k, g]: [string, any]) => (
+                              <option key={k} value={k}>{lang === "ar" ? g.name_ar : g.name_en}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-mono text-cyan-400">{t.appleTierLabel}</label>
+                          <select value={appleTier} onChange={(e) => setAppleTier(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                            {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations[appleGen]?.tiers || {}).map(([k, tier]: [string, any]) => (
+                              <option key={k} value={k}>{lang === "ar" ? tier.name_ar || tier.name : tier.name}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-mono text-cyan-400">{t.appleTierLabel}</label>
-                        <select value={appleTier} onChange={(e) => setAppleTier(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                          {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations[appleGen]?.tiers || {}).map(([k, tier]: [string, any]) => (
-                            <option key={k} value={k}>{lang === "ar" ? tier.name_ar || tier.name : tier.name}</option>
-                          ))}
+                        <label className="text-[10px] font-mono text-cyan-400">{t.internalAllocatedStorage}</label>
+                        <select value={phoneStorage} onChange={(e) => setPhoneStorage(parseInt(e.target.value))} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
+                          <option value="64">64 GB Storage</option>
+                          <option value="128">128 GB Storage</option>
+                          <option value="256">256 GB Storage</option>
                         </select>
                       </div>
-                    </div>
+                    </>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-mono text-cyan-400">{t.smartphoneTabletName}</label>
-                        <input type="text" value={phoneName} onChange={(e) => setPhoneName(e.target.value)} placeholder={t.smartphoneNamePlaceholder} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right text-gray-300 w-full" />
+                    <div className="flex flex-col gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-mono text-cyan-400">{t.smartphoneTabletName}</label>
+                          <input type="text" value={phoneName} onChange={(e) => setPhoneName(e.target.value)} placeholder={t.smartphoneNamePlaceholder} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right text-gray-300 w-full" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-mono text-cyan-400">{t.coreProcessor}</label>
+                          <input type="text" value={phoneCpu} onChange={(e) => setPhoneCpu(e.target.value)} placeholder={t.smartphoneCpuPlaceholder} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right text-gray-300 w-full" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-mono text-cyan-400">{t.integratedGraphics}</label>
+                          <input type="text" value={phoneGpu} onChange={(e) => setPhoneGpu(e.target.value)} placeholder={t.smartphoneGpuPlaceholder} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right text-gray-300 w-full" />
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-mono text-cyan-400">{t.coreProcessor}</label>
-                        <input type="text" value={phoneCpu} onChange={(e) => setPhoneCpu(e.target.value)} placeholder={t.smartphoneCpuPlaceholder} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right text-gray-300 w-full" />
+
+                      {/* Android RAM Slider */}
+                      <div className="flex flex-col gap-1 bg-gray-950/40 p-4 rounded-xl border border-gray-900 mt-1">
+                        <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-teal-400">
+                          <span>ذاكرة الجهاز (RAM)</span>
+                          <span>{phoneRam} GB</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={2}
+                          max={16}
+                          step={2}
+                          value={phoneRam}
+                          onChange={(e) => setPhoneRam(parseInt(e.target.value))}
+                          className="w-full accent-cyan-500 cursor-pointer"
+                        />
                       </div>
+
+                      {/* Android Storage Input */}
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-mono text-cyan-400">{t.integratedGraphics}</label>
-                        <input type="text" value={phoneGpu} onChange={(e) => setPhoneGpu(e.target.value)} placeholder={t.smartphoneGpuPlaceholder} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right text-gray-300 w-full" />
+                        <label className="text-[10px] font-mono text-cyan-400">{t.internalAllocatedStorage}</label>
+                        <input
+                          type="number"
+                          min={16}
+                          max={1024}
+                          value={phoneStorage || ""}
+                          onChange={(e) => setPhoneStorage(parseInt(e.target.value) || 0)}
+                          placeholder="مثال: 128"
+                          className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right text-gray-300 w-full"
+                        />
                       </div>
                     </div>
                   )}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-mono text-cyan-400">{t.internalAllocatedStorage}</label>
-                    <select value={phoneStorage} onChange={(e) => setPhoneStorage(parseInt(e.target.value))} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
-                      <option value="64">64 GB Storage</option>
-                      <option value="128">128 GB Storage</option>
-                      <option value="256">256 GB Storage</option>
-                    </select>
-                  </div>
                 </div>
               )}
             </div>
