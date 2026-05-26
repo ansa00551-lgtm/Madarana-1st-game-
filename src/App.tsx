@@ -23,6 +23,7 @@ import {
   RotateCcw, 
   ExternalLink 
 } from "lucide-react";
+import { UAParser } from "ua-parser-js";
 
 import { Game, SystemSpecs, AnalysisResult } from "./types";
 import { 
@@ -310,11 +311,14 @@ export default function App() {
 
   const [ramGB, setRamGB] = useState(16);
   const [vramGB, setVramGB] = useState(8);
-  const [storageGB, setStorageGB] = useState(150);
+  const [storageGB, setStorageGB] = useState(256);
   const [ramSpeedMHz, setRamSpeedMHz] = useState(3200);
   const [isOverclocked, setIsOverclocked] = useState(false);
-  const [storageType, setStorageType] = useState<string>("NVMe SSD");
-  const [osName, setOsName] = useState("Windows 11 64-bit");
+  const [storageType, setStorageType] = useState<string>("NVMe M.2 SSD (Gen 4)");
+  const [osName, setOsName] = useState("Windows 11");
+  const [ramGen, setRamGen] = useState<string>("DDR4");
+  const [linuxDistro, setLinuxDistro] = useState("Ubuntu");
+  const [androidScanWarning, setAndroidScanWarning] = useState(false);
 
   // PC Sub-groups
   const [pcCategory, setPcCategory] = useState<"custom" | "apple-mac">("custom");
@@ -325,9 +329,9 @@ export default function App() {
   const [laptopError, setLaptopError] = useState("");
 
   const [mobileSubType, setMobileSubType] = useState<"android" | "apple-ios">("android");
-  const [appleFamily, setAppleFamily] = useState<string>("macbook_pro");
-  const [appleGen, setAppleGen] = useState<string>("m3-chipsets");
-  const [appleTier, setAppleTier] = useState<string>("pro");
+  const [appleFamily, setAppleFamily] = useState<string>("apple_silicon_era");
+  const [appleGen, setAppleGen] = useState<string>("m3-series2");
+  const [appleTier, setAppleTier] = useState<string>("m3_pro_mb");
 
   const [autoScanStatus, setAutoScanStatus] = useState<"idle" | "running" | "success">("idle");
   const [scanLogs, setScanLogs] = useState<string[]>([]);
@@ -363,23 +367,31 @@ export default function App() {
   // Setup simulated automatic scan function
   useEffect(() => {
     (window as any).smartHardwareScan = () => {
+      const parser = new UAParser();
+      const res = parser.getResult();
       const ua = navigator.userAgent.toLowerCase();
+      
       let device: "desktop" | "mobile" | "console" | "handheld" = "desktop";
       let isApple = /ipad|iphone|macintosh|mac os x/.test(ua);
       let isAndroid = /android/.test(ua);
 
-      if (/iphone|ipad/.test(ua)) device = "mobile";
-      else if (isAndroid) device = "mobile";
+      if (/iphone|ipad/.test(ua) || res.device.type === "mobile" || res.device.type === "tablet") {
+        device = "mobile";
+      } else if (isAndroid) {
+        device = "mobile";
+      }
 
       const cores = navigator.hardwareConcurrency || 8;
       const detectedRam = (navigator as any).deviceMemory || 16;
 
-      let cpuName = "Intel Core i7-12700K";
-      if (cores >= 12) cpuName = "Intel Core i9-13950H";
+      let cpuName = "Intel Core i7-12705K";
+      if (cores >= 12) cpuName = "Intel Core i9-13900K";
       else if (cores >= 6) cpuName = "AMD Ryzen 5 5600X";
 
       if (isApple) {
         if (/iphone|ipad/.test(ua)) {
+          const modelString = res.device.model || "";
+          const displayModel = modelString ? `iPhone ${modelString}` : "iPhone 15 Pro Max";
           return {
             deviceType: "mobile",
             mobileSubType: "apple-ios",
@@ -390,16 +402,17 @@ export default function App() {
             ramGB: 8,
             vramGB: 3,
             storageGB: 256,
-            storageType: "NVMe SSD",
+            storageType: "NVMe M.2 SSD (Gen 4)",
             motherboardModel: "",
             appleFamily: "iphone",
-            appleGen: "iphone-15",
-            appleTier: "pro",
-            phoneName: "iPhone 15 Pro",
+            appleGen: "series-15",
+            appleTier: "iphone_15_pro_max",
+            phoneName: displayModel,
             phoneCpu: "Apple A17 Pro",
             phoneGpu: "Apple A17 Pro (Apple GPU)",
             phoneRam: 8,
-            phoneStorage: 256
+            phoneStorage: 256,
+            requiresAndroidPrompt: false
           };
         } else {
           return {
@@ -409,26 +422,54 @@ export default function App() {
             pcSubType: "laptop",
             cpuName: "Apple M3 Pro",
             gpuName: "Apple M3 Pro (Unified GPU)",
-            ramGB: 18,
+            ramGB: 16,
             vramGB: 8,
             storageGB: 512,
-            storageType: "NVMe SSD",
+            storageType: "NVMe M.2 SSD (Gen 4)",
             motherboardModel: "",
-            appleFamily: "macbook_pro",
-            appleGen: "m3-chipsets",
-            appleTier: "pro",
+            appleFamily: "apple_silicon_era",
+            appleGen: "m3-series2",
+            appleTier: "m3_pro_mb",
             phoneName: "",
             phoneCpu: "",
             phoneGpu: "",
             phoneRam: 16,
-            phoneStorage: 512
+            phoneStorage: 512,
+            requiresAndroidPrompt: false
           };
         }
       }
 
+      if (isAndroid) {
+        const vendor = res.device.vendor || "Samsung";
+        const model = res.device.model || "Galaxy S24 Ultra";
+        return {
+          deviceType: "mobile",
+          mobileSubType: "android",
+          pcCategory: "custom",
+          pcSubType: "desktop",
+          cpuName: "Octa-core ARM Processor",
+          gpuName: "ARM Mali / Adreno Graphics",
+          ramGB: detectedRam,
+          vramGB: Math.round(detectedRam * 0.4),
+          storageGB: 256,
+          storageType: "SATA SSD",
+          motherboardModel: "",
+          appleFamily: "",
+          appleGen: "",
+          appleTier: "",
+          phoneName: `${vendor} ${model}`,
+          phoneCpu: "Snapdragon 8 Gen 3",
+          phoneGpu: "Adreno 750",
+          phoneRam: detectedRam > 16 ? 12 : detectedRam,
+          phoneStorage: 256,
+          requiresAndroidPrompt: true
+        };
+      }
+
       return {
         deviceType: device,
-        mobileSubType: isAndroid ? "android" : "apple-ios",
+        mobileSubType: "android",
         pcCategory: "custom",
         pcSubType: "desktop",
         cpuName: cpuName,
@@ -436,16 +477,17 @@ export default function App() {
         ramGB: detectedRam,
         vramGB: detectedRam >= 16 ? 8 : 4,
         storageGB: 512,
-        storageType: "NVMe SSD",
-        motherboardModel: "ASUS PRIME Z790-P",
-        appleFamily: "",
-        appleGen: "",
-        appleTier: "",
-        phoneName: isAndroid ? "Samsung Galaxy S23" : "Google Pixel 8",
-        phoneCpu: isAndroid ? "Snapdragon 8 Gen 2" : "Google Tensor G3",
-        phoneGpu: isAndroid ? "Adreno 740" : "Mali-G715",
-        phoneRam: 8,
-        phoneStorage: 256
+        storageType: "NVMe M.2 SSD (Gen 4)",
+        motherboardModel: "ASUSTeK COMPUTER INC. PRIME Z790-P",
+        appleFamily: "apple_silicon_era",
+        appleGen: "m3-series2",
+        appleTier: "m3_pro_mb",
+        phoneName: "Samsung Galaxy S24 Ultra",
+        phoneCpu: "Snapdragon 8 Gen 3",
+        phoneGpu: "Adreno 750",
+        phoneRam: 12,
+        phoneStorage: 256,
+        requiresAndroidPrompt: false
       };
     };
   }, []);
@@ -547,6 +589,7 @@ export default function App() {
         }
       } else {
         const { cpuScore, gpuScore, defaultVram } = estimateHardwareScores(customCpu, customGpu);
+        const derivedOS = osName === "Linux" ? `Linux (${linuxDistro})` : osName;
         setSpecs({
           cpuName: customCpu,
           cpuScore,
@@ -555,8 +598,8 @@ export default function App() {
           ramGB,
           vramGB: Math.max(vramGB, defaultVram),
           storageGB,
-          isSSD: storageType.includes("SSD") || storageType.includes("UFS"),
-          os: osName
+          isSSD: storageType.toLowerCase().includes("ssd") || storageType.toLowerCase().includes("flash") || storageType.toLowerCase().includes("ufs"),
+          os: derivedOS
         });
       }
     } else if (deviceType === "console") {
@@ -570,7 +613,7 @@ export default function App() {
           ramGB: modelItem.ramGB,
           vramGB: modelItem.vramGB,
           storageGB: modelItem.storageGB,
-          isSSD: modelItem.storageType.includes("SSD"),
+          isSSD: modelItem.storageType.toLowerCase().includes("ssd") || modelItem.storageType.toLowerCase().includes("flash") || modelItem.storageType.toLowerCase().includes("integrated"),
           os: `${consoleBrand.toUpperCase()} OS`
         });
       }
@@ -585,7 +628,7 @@ export default function App() {
           ramGB: modelItem.ramGB,
           vramGB: modelItem.vramGB,
           storageGB: modelItem.storageGB,
-          isSSD: modelItem.storageType.includes("SSD"),
+          isSSD: modelItem.storageType.toLowerCase().includes("ssd") || modelItem.storageType.toLowerCase().includes("flash"),
           os: `${handheldBrand.toUpperCase()} OS`
         });
       }
@@ -626,7 +669,7 @@ export default function App() {
     deviceType, customCpu, customGpu, ramGB, vramGB, storageGB, storageType, osName, 
     consoleBrand, consoleModel, handheldBrand, handheldModel, phoneName, phoneCpu, 
     phoneGpu, phoneRam, phoneStorage, pcCategory, pcSubType, mobileSubType, appleFamily, 
-    appleGen, appleTier
+    appleGen, appleTier, ramGen, linuxDistro
   ]);
 
   // Core local diagnostic generator
@@ -895,6 +938,8 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
         if (typeof (window as any).smartHardwareScan === "function") {
           const detected = (window as any).smartHardwareScan();
           setDeviceType(detected.deviceType);
+          setAndroidScanWarning(detected.requiresAndroidPrompt || false);
+          
           if (detected.deviceType === "desktop") {
             setPcCategory(detected.pcCategory);
             if (detected.pcCategory === "apple-mac") {
@@ -908,11 +953,13 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
               setRamGB(detected.ramGB);
               setVramGB(detected.vramGB);
               setStorageGB(detected.storageGB);
+              setStorageType(detected.storageType);
               setMotherboardModel(detected.motherboardModel);
             }
           } else if (detected.deviceType === "mobile") {
             setMobileSubType(detected.mobileSubType);
             if (detected.mobileSubType === "apple-ios") {
+              setAppleFamily("iphone");
               setAppleGen(detected.appleGen);
               setAppleTier(detected.appleTier);
             } else {
@@ -925,7 +972,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
           }
         }
         setAutoScanStatus("success");
-        setTimeout(() => setAutoScanStatus("idle"), 3000);
+        setTimeout(() => setAutoScanStatus("idle"), 4000);
       }
     }, 400);
   };
@@ -1133,8 +1180,6 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   </div>
                 )}
               </div>
-
-              {/* Conditional parameters rendering block */}
               {deviceType === "desktop" && (
                 <div className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-950/40 p-3.5 rounded-xl border border-gray-900">
@@ -1142,7 +1187,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                       <label className="text-[10px] font-mono text-cyan-300/80">{t.pcCategoryLabel}</label>
                       <div className="grid grid-cols-2 gap-2 bg-gray-950 p-1.5 rounded-xl border border-gray-850">
                         <button type="button" onClick={() => setPcCategory("custom")} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${pcCategory === "custom" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-gray-500"}`}>{t.customPcOpt}</button>
-                        <button type="button" onClick={() => { setPcCategory("apple-mac"); handleAppleFamilyChange("macbook_pro"); }} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${pcCategory === "apple-mac" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-gray-500"}`}>{t.appleMacOpt}</button>
+                        <button type="button" onClick={() => { setPcCategory("apple-mac"); handleAppleFamilyChange("apple_silicon_era"); }} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${pcCategory === "apple-mac" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-gray-500"}`}>{t.appleMacOpt}</button>
                       </div>
                     </div>
                     {pcCategory === "custom" && (
@@ -1190,28 +1235,74 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                           <label className="text-[10px] font-mono text-cyan-300/80">{t.overclock}</label>
                           <div className="grid grid-cols-2 gap-2 bg-gray-950 p-1.5 rounded-xl border border-gray-850">
                             <button type="button" onClick={() => setIsOverclocked(true)} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer flex items-center justify-center gap-1 ${isOverclocked ? "bg-orange-500/10 text-orange-400 border border-orange-500/20" : "text-gray-500"}`}><Flame className="w-3.5 h-3.5" /> {t.overclockOn}</button>
-                            <button type="button" onClick={() => setIsOverclocked(false)} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${!isOverclocked ? "bg-gray-900 text-gray-400 border border-gray-805" : "text-gray-500"}`}>{t.overclockOff}</button>
+                            <button type="button" onClick={() => setIsOverclocked(false)} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${!isOverclocked ? "bg-gray-900 text-gray-400 border border-gray-850" : "text-gray-500"}`}>{t.overclockOff}</button>
                           </div>
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-mono text-cyan-300/80">{t.storageType}</label>
+                          <label className="text-[10px] font-mono text-cyan-300/80">نوع وسرعة وحدة التخزين (Drive Interface & Speed)</label>
                           <select value={storageType} onChange={(e) => setStorageType(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                            <option value="NVMe SSD">NVMe M.2 SSD</option>
-                            <option value="SATA HDD">SATA HDD</option>
+                            <option value="SATA HDD">SATA HDD (Mechanical Magnetic)</option>
+                            <option value="SATA SSD (550 MB/s)">SATA SSD (Solid State - 550 MB/s)</option>
+                            <option value="NVMe M.2 SSD (Gen 3 - 3500 MB/s)">NVMe M.2 SSD (PCIe Gen 3 - 3500 MB/s)</option>
+                            <option value="NVMe M.2 SSD (Gen 4 - 7000 MB/s)">NVMe M.2 SSD (PCIe Gen 4 - 7000 MB/s)</option>
+                            <option value="NVMe M.2 SSD (Gen 5 - 14000 MB/s)">NVMe M.2 SSD (PCIe PCIe Gen 5 - 14000 MB/s)</option>
                           </select>
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-mono text-cyan-300/80">{t.os}</label>
-                          <select value={osName} onChange={(e) => setOsName(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                            <option value="Windows 11">Windows 11</option>
-                            <option value="Windows 10">Windows 10</option>
+                          <label className="text-[10px] font-mono text-cyan-305/85">جيل ذاكرة الـ RAM (RAM Generation)</label>
+                          <select value={ramGen} onChange={(e) => setRamGen(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                            <option value="DDR5">DDR5 (High Bandwidth / Modern)</option>
+                            <option value="DDR4">DDR4 (Standard mainstream)</option>
+                            <option value="DDR3">DDR3 (Legacy)</option>
+                            <option value="DDR2">DDR2 (Vintage)</option>
+                            <option value="DDR1">DDR1 (Retro)</option>
+                            <option value="SDRAM">SDRAM (Classic legacy)</option>
                           </select>
                         </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-mono text-cyan-300/80">نظام التشغيل (Operating System)</label>
+                          <select value={osName} onChange={(e) => setOsName(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-200 w-full">
+                            <optgroup label="Microsoft Windows">
+                              <option value="Windows 11">Windows 11</option>
+                              <option value="Windows 10">Windows 10</option>
+                              <option value="Windows 8.1">Windows 8.1</option>
+                              <option value="Windows 8">Windows 8</option>
+                              <option value="Windows 7">Windows 7</option>
+                              <option value="Windows XP">Windows XP</option>
+                              <option value="Windows 98">Windows 98</option>
+                            </optgroup>
+                            <optgroup label="Apple macOS">
+                              <option value="macOS Sequoia">macOS Sequoia (Modern)</option>
+                              <option value="macOS Sonoma">macOS Sonoma</option>
+                              <option value="macOS Ventura">macOS Ventura</option>
+                              <option value="macOS Monterey">macOS Monterey</option>
+                              <option value="OS X El Capitan">OS X El Capitan</option>
+                              <option value="OS X Yosemite">OS X Yosemite</option>
+                              <option value="Mac OS X Snow Leopard">Mac OS X Snow Leopard</option>
+                              <option value="Mac OS 9 (Classic PowerPC OS)">Mac OS 9 (Classic PowerPC OS)</option>
+                            </optgroup>
+                            <optgroup label="Open-Source Linux">
+                              <option value="Linux">Linux (توزيعة مخصصة)</option>
+                            </optgroup>
+                          </select>
+                        </div>
+                        {osName === "Linux" && (
+                          <div className="flex flex-col gap-1.5 animate-fade-in">
+                            <label className="text-[10px] font-mono text-cyan-400">اسم التوزيعة النشطة (Linux Distribution)</label>
+                            <input
+                              type="text"
+                              value={linuxDistro}
+                              onChange={(e) => setLinuxDistro(e.target.value)}
+                              placeholder="مثال: Ubuntu, Arch Linux, Mint"
+                              className="bg-gray-950 border border-cyan-900 p-3 rounded-xl text-xs outline-none focus:border-cyan-500 text-right text-gray-300 w-full"
+                            />
+                          </div>
+                        )}
                       </div>
                     </>
                   ) : (
                     /* Apple Silicon selectors */
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30 text-right">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.appleFamilyLabel}</label>
                         <select value={appleFamily} onChange={(e) => handleAppleFamilyChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
@@ -1240,17 +1331,31 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   )}
 
                   {/* Range Sliders for sizes */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-950/40 p-4 rounded-xl border border-gray-900 mt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-gray-950/40 p-4 rounded-xl border border-gray-900 mt-1">
                     <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-teal-400"><span>{t.ram}</span><span>{ramGB} GB</span></div>
+                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-teal-400">
+                        <span>{t.ram || "الذاكرة العشوائية"}</span>
+                        <span>{ramGB} GB {pcCategory === "custom" && `(${ramGen})`}</span>
+                      </div>
                       {pcCategory === "custom" ? (
-                        <input type="range" min={4} max={128} step={4} value={ramGB} onChange={(e) => setRamGB(parseInt(e.target.value))} className="w-full accent-cyan-500 cursor-pointer" />
+                        <input type="range" min={2} max={256} step={2} value={ramGB} onChange={(e) => setRamGB(parseInt(e.target.value))} className="w-full accent-cyan-500 cursor-pointer" />
                       ) : (
-                        <div className="h-2 bg-gray-900 rounded-full overflow-hidden mt-2"><div className="h-full bg-cyan-500 rounded-full" style={{ width: `${Math.min(100, (ramGB / 128) * 100)}%` }} /></div>
+                        <div className="h-2 bg-gray-900 rounded-full overflow-hidden mt-2"><div className="h-full bg-cyan-500 rounded-full" style={{ width: `${Math.min(100, (ramGB / 256) * 100)}%` }} /></div>
                       )}
                     </div>
+
+                    {pcCategory === "custom" && (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-orange-400">
+                          <span>سرعة الذاكرة (RAM Speed)</span>
+                          <span>{ramSpeedMHz} MHz</span>
+                        </div>
+                        <input type="range" min={1600} max={8600} step={100} value={ramSpeedMHz} onChange={(e) => setRamSpeedMHz(parseInt(e.target.value))} className="w-full accent-cyan-500 cursor-pointer" />
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-indigo-400"><span>{t.vram}</span><span>{vramGB} GB</span></div>
+                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-indigo-400"><span>{t.vram || "ذاكرة كرت الشاشة"}</span><span>{vramGB} GB</span></div>
                       {pcCategory === "custom" ? (
                         <input type="range" min={1} max={24} step={1} value={vramGB} onChange={(e) => setVramGB(parseInt(e.target.value))} className="w-full accent-cyan-500 cursor-pointer" />
                       ) : (
@@ -1258,8 +1363,11 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                       )}
                     </div>
                     <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-cyan-400"><span>{t.storage}</span><span>{storageGB} GB</span></div>
-                      <input type="range" min={10} max={1000} step={10} value={storageGB} onChange={(e) => setStorageGB(parseInt(e.target.value))} className="w-full accent-cyan-500 cursor-pointer" />
+                      <div className="flex justify-between text-[10px] font-mono font-bold uppercase text-cyan-400">
+                        <span>{t.storage || "مساحة التخزين"}</span>
+                        <span>{storageGB >= 1024 ? `${(storageGB / 1024).toFixed(1)} TB` : `${storageGB} GB`}</span>
+                      </div>
+                      <input type="range" min={16} max={16384} step={16} value={storageGB} onChange={(e) => setStorageGB(parseInt(e.target.value))} className="w-full accent-cyan-500 cursor-pointer" />
                     </div>
                   </div>
                 </div>
