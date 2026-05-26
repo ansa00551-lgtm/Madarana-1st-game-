@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-    // 1. حماية السيرفر: السماح لموقعك على Vercel بالاتصال به بناءً على التعديل الأول
+    // 1. إعدادات الأمان والسماح لموقعك فقط بالاتصال
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', 'https://madarana-1st-game.vercel.app');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -8,22 +8,20 @@ export default async function handler(req, res) {
         'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
     );
 
-    // التعامل مع طلبات الفحص المبدئية من المتصفح (Preflight)
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
     }
 
-    // منع أي نوع طلبات آخر غير POST
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // معرفة نوع الطلب (هل المستخدم يبحث عن لعبة أم يحلل الأداء مع جمني؟)
+    // استقبال البيانات القادمة من موقعك
     const { type, prompt, gameName } = req.body;
 
     // --------------------------------------------------------
-    // الجزء الأول: إذا كان الطلب خاص بـ RAWG (البحث عن لعبة)
+    // الجزء الأول: البحث عن لعبة في RAWG (يجلب 10 ألعاب كما أردت)
     // --------------------------------------------------------
     if (type === 'search_game') {
         const RAWG_KEY = process.env.RAWG_API_KEY;
@@ -31,7 +29,6 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'مفتاح RAWG غير معرف في السيرفر' });
         }
         try {
-            // الاتصال بـ RAWG من السيرفر وإخفاء المفتاح
             const rawgResponse = await fetch(`https://api.rawg.io/api/games?key=${RAWG_KEY}&search=${encodeURIComponent(gameName)}&page_size=10`);
             const data = await rawgResponse.json();
             return res.status(200).json(data);
@@ -41,7 +38,7 @@ export default async function handler(req, res) {
     }
 
     // --------------------------------------------------------
-    // الجزء الثاني: إذا كان الطلب خاص بـ Gemini (تحليل الأداء)
+    // الجزء الثاني: الاتصال بـ Gemini (بالموديل الجديد الصحيح)
     // --------------------------------------------------------
     const API_KEY = process.env.GEMINI_API_KEY;
     if (!API_KEY) {
@@ -49,7 +46,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        // تحديث رابط الـ API باسم النموذج الجديد بناءً على التعديل الثاني في الصورة
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
