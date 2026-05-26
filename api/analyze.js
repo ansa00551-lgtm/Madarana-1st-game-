@@ -17,11 +17,11 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // استقبال البيانات القادمة من موقعك
+    // استقبال البيانات القادمة من الواجهة
     const { type, prompt, gameName } = req.body;
 
     // --------------------------------------------------------
-    // الجزء الأول: البحث عن لعبة في RAWG (يجلب 10 ألعاب كما أردت)
+    // الجزء الأول: البحث عن لعبة محددة (جلب 10 ألعاب للبحث)
     // --------------------------------------------------------
     if (type === 'search_game') {
         const RAWG_KEY = process.env.RAWG_API_KEY;
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     }
 
     // --------------------------------------------------------
-    // الجزء الثاني: الاتصال بـ Gemini (بالموديل الجديد الصحيح)
+    // الجزء الثاني: الاتصال بـ Gemini (تم استخدام الاسم الرسمي المستقر هنا)
     // --------------------------------------------------------
     const API_KEY = process.env.GEMINI_API_KEY;
     if (!API_KEY) {
@@ -46,7 +46,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`, {
+        // تم التعديل إلى الموديل الرسمي المستقر الحالي لـ Gemini 2.5 Flash
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
