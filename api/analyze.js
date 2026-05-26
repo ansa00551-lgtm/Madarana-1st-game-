@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
-    // 1. حماية السيرفر: السماح لموقعك فقط على GitHub Pages بالاتصال به
+    // 1. حماية السيرفر: السماح لموقعك على Vercel بالاتصال به بناءً على التعديل الأول
     res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', 'https://ansa00551-lgtm.github.io');
+    res.setHeader('Access-Control-Allow-Origin', 'https://madarana-1st-game.vercel.app');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader(
         'Access-Control-Allow-Headers',
@@ -49,7 +49,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`, {
+        // تحديث رابط الـ API باسم النموذج الجديد بناءً على التعديل الثاني في الصورة
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
