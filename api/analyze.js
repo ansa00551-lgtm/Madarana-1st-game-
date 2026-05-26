@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         }
         try {
             // الاتصال بـ RAWG من السيرفر وإخفاء المفتاح
-            const rawgResponse = await fetch(`https://api.rawg.io/api/games?key=${RAWG_KEY}&search=${encodeURIComponent(gameName)}&page_size=1`);
+            const rawgResponse = await fetch(`https://api.rawg.io/api/games?key=${RAWG_KEY}&search=${encodeURIComponent(gameName)}&page_size=10`);
             const data = await rawgResponse.json();
             return res.status(200).json(data);
         } catch (error) {
