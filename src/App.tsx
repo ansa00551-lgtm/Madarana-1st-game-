@@ -31,7 +31,8 @@ import {
   CONSOLE_MODELS, 
   HANDHELD_BRANDS, 
   HANDHELD_MODELS, 
-  APPLE_DEVICES_TREE, 
+  IPHONE_MODELS,
+  MAC_MODELS, 
   POPULAR_FALLBACK_GAMES 
 } from "./data";
 
@@ -329,17 +330,17 @@ export default function App() {
   const [laptopError, setLaptopError] = useState("");
 
   const [mobileSubType, setMobileSubType] = useState<"android" | "apple-ios">("android");
-  const [appleFamily, setAppleFamily] = useState<string>("apple_silicon_era");
-  const [appleGen, setAppleGen] = useState<string>("m3-series2");
-  const [appleTier, setAppleTier] = useState<string>("m3_pro_mb");
+  const [appleFamily, setAppleFamily] = useState<string>("apple_silicon");
+  const [appleModel, setAppleModel] = useState<string>("MacBook Pro M3");
+  const [iphoneModel, setIphoneModel] = useState<string>("iPhone 15 Pro Max");
 
   const [autoScanStatus, setAutoScanStatus] = useState<"idle" | "running" | "success">("idle");
   const [scanLogs, setScanLogs] = useState<string[]>([]);
 
   const [consoleBrand, setConsoleBrand] = useState("sony");
-  const [consoleModel, setConsoleModel] = useState("ps5");
+  const [consoleModel, setConsoleModel] = useState("PlayStation 5 (Base/Fat)");
   const [handheldBrand, setHandheldBrand] = useState("valve");
-  const [handheldModel, setHandheldModel] = useState("steam-deck-oled");
+  const [handheldModel, setHandheldModel] = useState("Steam Deck OLED");
 
   const [phoneName, setPhoneName] = useState("Samsung Galaxy S24 Ultra");
   const [phoneCpu, setPhoneCpu] = useState("Snapdragon 8 Gen 3");
@@ -382,11 +383,72 @@ export default function App() {
       }
 
       const cores = navigator.hardwareConcurrency || 8;
-      const detectedRam = (navigator as any).deviceMemory || 16;
+      const detectedRam = (navigator as any).deviceMemory || (cores >= 12 ? 32 : 16);
 
-      let cpuName = "Intel Core i7-12705K";
-      if (cores >= 12) cpuName = "Intel Core i9-13900K";
-      else if (cores >= 6) cpuName = "AMD Ryzen 5 5600X";
+      // Attempt real hardware unmasking using the WebGL debug renderer info extension
+      let detectedGpu = "";
+      try {
+        const canvas = document.createElement("canvas");
+        const gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as any;
+        if (gl) {
+          const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+          if (debugInfo) {
+            detectedGpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || "";
+          }
+        }
+      } catch (e) {
+        console.warn("Unable to unmask WebGL GPU: ", e);
+      }
+
+      // Cleanup raw WebGL GPU string (e.g., removing ANGLE browser container layer / active driver details)
+      let cleanGpu = "NVIDIA GeForce RTX 3070"; // Core default baseline inside the application
+      if (detectedGpu) {
+        let tempGpu = detectedGpu;
+        // Strip ANGLE wrapper syntax: "ANGLE (vendor, GPU model, driver)"
+        const angleMatch = tempGpu.match(/angle\s*\(\s*[^,]+,\s*([^,()]+(?:(?:\([^)]*\))?[^,()]*)*)/i);
+        if (angleMatch && angleMatch[1]) {
+          tempGpu = angleMatch[1];
+        }
+        tempGpu = tempGpu
+          .replace(/direct3d\d*/gi, "")
+          .replace(/vs_\d+_\d+\s+ps_\d+_\d+/gi, "")
+          .replace(/(nvidia\s+corporation|advanced\s+micro\s+devices,\s+inc\.|intel\s+inc\.|apple\s+inc\.)/gi, "")
+          .replace(/opengl\s*.*$/gi, "")
+          .replace(/\s*,.*$/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        
+        if (tempGpu.length > 3) {
+          cleanGpu = tempGpu;
+        }
+      }
+
+      // Calculate approximate dedicated Video RAM (VRAM) size in GB based on GPU product numbers
+      let estimatedVram = 8;
+      const lowerGpu = cleanGpu.toLowerCase();
+      if (lowerGpu.includes("4090") || lowerGpu.includes("3090")) estimatedVram = 24;
+      else if (lowerGpu.includes("4080")) estimatedVram = 16;
+      else if (lowerGpu.includes("4070 ti") || lowerGpu.includes("4070ti")) estimatedVram = 12;
+      else if (lowerGpu.includes("4070")) estimatedVram = 12;
+      else if (lowerGpu.includes("4060 ti") || lowerGpu.includes("4060ti")) estimatedVram = 8;
+      else if (lowerGpu.includes("4060")) estimatedVram = 8;
+      else if (lowerGpu.includes("3085") || lowerGpu.includes("3080") || lowerGpu.includes("7900")) estimatedVram = 16;
+      else if (lowerGpu.includes("3070 ti") || lowerGpu.includes("3070") || lowerGpu.includes("6800") || lowerGpu.includes("7800")) estimatedVram = 8;
+      else if (lowerGpu.includes("3060")) estimatedVram = 12;
+      else if (lowerGpu.includes("2080") || lowerGpu.includes("2070") || lowerGpu.includes("5700") || lowerGpu.includes("6600")) estimatedVram = 8;
+      else if (lowerGpu.includes("2060") || lowerGpu.includes("1060")) estimatedVram = 6;
+      else if (lowerGpu.includes("intel") || lowerGpu.includes("uhd") || lowerGpu.includes("iris") || lowerGpu.includes("arc")) {
+        estimatedVram = lowerGpu.includes("a770") ? 16 : lowerGpu.includes("a750") ? 8 : 4;
+      }
+
+      // Calculate highly realistic CPU baseline from actual physical thread cores count
+      let cleanCpu = "Intel Core i7-12700K";
+      if (cores >= 24) cleanCpu = "Intel Core i9-14900K";
+      else if (cores >= 16) cleanCpu = "AMD Ryzen 9 7900X";
+      else if (cores >= 12) cleanCpu = "Intel Core i7-13700K";
+      else if (cores >= 8) cleanCpu = "Intel Core i5-12600K";
+      else if (cores >= 6) cleanCpu = "AMD Ryzen 5 5600X";
+      else cleanCpu = "Intel Core i3-10100";
 
       if (isApple) {
         if (/iphone|ipad/.test(ua)) {
@@ -405,8 +467,8 @@ export default function App() {
             storageType: "NVMe M.2 SSD (Gen 4)",
             motherboardModel: "",
             appleFamily: "iphone",
-            appleGen: "series-15",
-            appleTier: "iphone_15_pro_max",
+            appleModel: "MacBook Pro M3",
+            iphoneModel: "iPhone 15 Pro Max",
             phoneName: displayModel,
             phoneCpu: "Apple A17 Pro",
             phoneGpu: "Apple A17 Pro (Apple GPU)",
@@ -415,26 +477,46 @@ export default function App() {
             requiresAndroidPrompt: false
           };
         } else {
+          // macOS Computer detection mapping
+          let macFam = "apple_silicon";
+          let macModel = "MacBook Pro M3";
+          
+          const gpuLower = cleanGpu.toLowerCase();
+          if (gpuLower.includes("intel")) {
+            macFam = "intel_legacy";
+            macModel = cores >= 8 ? "MacBook Pro 16\" (Intel Core i9)" : "MacBook Pro 13\" (Intel Core i5)";
+          } else if (gpuLower.includes("powerpc") || gpuLower.includes("g5") || gpuLower.includes("g4") || gpuLower.includes("g3")) {
+            macFam = "powerpc_legacy";
+            macModel = "Power Mac G5";
+          } else {
+            macFam = "apple_silicon";
+            if (cores >= 16) macModel = "MacBook Pro M3 Max";
+            else if (cores >= 12) macModel = "MacBook Pro M3 Pro";
+            else if (cores >= 10) macModel = "MacBook Pro M4";
+            else if (cores >= 8) macModel = "MacBook Pro M3";
+            else macModel = "MacBook Air M1";
+          }
+
           return {
             deviceType: "desktop",
             mobileSubType: "android",
             pcCategory: "apple-mac",
             pcSubType: "laptop",
-            cpuName: "Apple M3 Pro",
-            gpuName: "Apple M3 Pro (Unified GPU)",
-            ramGB: 16,
-            vramGB: 8,
-            storageGB: 512,
+            cpuName: macModel,
+            gpuName: cleanGpu.includes("Apple") ? `${macModel} GPU` : cleanGpu,
+            ramGB: detectedRam,
+            vramGB: estimatedVram,
+            storageGB: detectedRam >= 16 ? 512 : 256,
             storageType: "NVMe M.2 SSD (Gen 4)",
             motherboardModel: "",
-            appleFamily: "apple_silicon_era",
-            appleGen: "m3-series2",
-            appleTier: "m3_pro_mb",
+            appleFamily: macFam,
+            appleModel: macModel,
+            iphoneModel: "iPhone 15 Pro Max",
             phoneName: "",
             phoneCpu: "",
             phoneGpu: "",
-            phoneRam: 16,
-            phoneStorage: 512,
+            phoneRam: detectedRam,
+            phoneStorage: 256,
             requiresAndroidPrompt: false
           };
         }
@@ -456,8 +538,8 @@ export default function App() {
           storageType: "SATA SSD",
           motherboardModel: "",
           appleFamily: "",
-          appleGen: "",
-          appleTier: "",
+          appleModel: "",
+          iphoneModel: "",
           phoneName: `${vendor} ${model}`,
           phoneCpu: "Snapdragon 8 Gen 3",
           phoneGpu: "Adreno 750",
@@ -472,16 +554,16 @@ export default function App() {
         mobileSubType: "android",
         pcCategory: "custom",
         pcSubType: "desktop",
-        cpuName: cpuName,
-        gpuName: "NVIDIA GeForce RTX 3070",
+        cpuName: cleanCpu,
+        gpuName: cleanGpu,
         ramGB: detectedRam,
-        vramGB: detectedRam >= 16 ? 8 : 4,
-        storageGB: 512,
+        vramGB: estimatedVram,
+        storageGB: detectedRam >= 32 ? 1024 : 512,
         storageType: "NVMe M.2 SSD (Gen 4)",
         motherboardModel: "ASUSTeK COMPUTER INC. PRIME Z790-P",
-        appleFamily: "apple_silicon_era",
-        appleGen: "m3-series2",
-        appleTier: "m3_pro_mb",
+        appleFamily: "apple_silicon",
+        appleModel: "MacBook Pro M3",
+        iphoneModel: "iPhone 15 Pro Max",
         phoneName: "Samsung Galaxy S24 Ultra",
         phoneCpu: "Snapdragon 8 Gen 3",
         phoneGpu: "Adreno 750",
@@ -569,24 +651,111 @@ export default function App() {
   useEffect(() => {
     if (deviceType === "desktop") {
       if (pcCategory === "apple-mac") {
-        const famNode = APPLE_DEVICES_TREE[appleFamily];
-        if (famNode) {
-          const genNode = famNode.generations[appleGen] || Object.values(famNode.generations)[0];
-          const tierNode = genNode?.tiers[appleTier] || Object.values(genNode?.tiers || {})[0];
-          if (tierNode) {
-            setSpecs({
-              cpuName: tierNode.chip,
-              cpuScore: tierNode.cpuScore,
-              gpuName: tierNode.chip + " (Unified GPU)",
-              gpuScore: tierNode.gpuScore,
-              ramGB: tierNode.ram,
-              vramGB: tierNode.vram,
-              storageGB,
-              isSSD: true,
-              os: "macOS Sequoia"
-            });
-          }
+        const modelLower = appleModel.toLowerCase();
+        let cpuName = appleModel;
+        let cpuScore = 5.0;
+        let gpuName = appleModel + " Graphics";
+        let gpuScore = 4.8;
+        let derivedRamGB = 8;
+        let derivedVramGB = 1;
+
+        if (modelLower.includes("m4")) {
+          cpuScore = 9.4;
+          gpuScore = 9.2;
+          derivedRamGB = 16;
+          derivedVramGB = 8;
+        } else if (modelLower.includes("m3 pro") || modelLower.includes("m3 max")) {
+          cpuScore = 8.8;
+          gpuScore = 8.5;
+          derivedRamGB = 16;
+          derivedVramGB = 8;
+        } else if (modelLower.includes("m3")) {
+          cpuScore = 8.2;
+          gpuScore = 7.8;
+          derivedRamGB = 8;
+          derivedVramGB = 4;
+        } else if (modelLower.includes("m2").valueOf() && modelLower.includes("ultra")) {
+          cpuScore = 9.8;
+          gpuScore = 9.8;
+          derivedRamGB = 64;
+          derivedVramGB = 32;
+        } else if (modelLower.includes("m2 max") || modelLower.includes("m2 studio")) {
+          cpuScore = 9.0;
+          gpuScore = 9.0;
+          derivedRamGB = 32;
+          derivedVramGB = 16;
+        } else if (modelLower.includes("m2 pro")) {
+          cpuScore = 8.2;
+          gpuScore = 8.0;
+          derivedRamGB = 16;
+          derivedVramGB = 8;
+        } else if (modelLower.includes("m2")) {
+          cpuScore = 7.8;
+          gpuScore = 7.2;
+          derivedRamGB = 8;
+          derivedVramGB = 4;
+        } else if (modelLower.includes("m1 pro") || modelLower.includes("m1 max")) {
+          cpuScore = 7.8;
+          gpuScore = 7.4;
+          derivedRamGB = 16;
+          derivedVramGB = 6;
+        } else if (modelLower.includes("m1")) {
+          cpuScore = 7.2;
+          gpuScore = 6.8;
+          derivedRamGB = 8;
+          derivedVramGB = 4;
+        } else if (modelLower.includes("intel core i9")) {
+          cpuScore = 7.0;
+          gpuScore = 6.8;
+          derivedRamGB = 32;
+          derivedVramGB = 8;
+        } else if (modelLower.includes("intel core i7")) {
+          cpuScore = 6.2;
+          gpuScore = 6.0;
+          derivedRamGB = 16;
+          derivedVramGB = 4;
+        } else if (modelLower.includes("intel core i5")) {
+          cpuScore = 5.4;
+          gpuScore = 5.2;
+          derivedRamGB = 8;
+          derivedVramGB = 2;
+        } else if (modelLower.includes("intel") || modelLower.includes("xeon")) {
+          cpuScore = 5.8;
+          gpuScore = 5.6;
+          derivedRamGB = 16;
+          derivedVramGB = 4;
+        } else if (modelLower.includes("g5")) {
+          cpuScore = 2.5;
+          gpuScore = 2.2;
+          derivedRamGB = 1;
+          derivedVramGB = 0.128;
+        } else if (modelLower.includes("g4") || modelLower.includes("emac")) {
+          cpuScore = 1.6;
+          gpuScore = 1.3;
+          derivedRamGB = 0.512;
+          derivedVramGB = 0.032;
+        } else if (modelLower.includes("g3")) {
+          cpuScore = 1.0;
+          gpuScore = 0.8;
+          derivedRamGB = 0.256;
+          derivedVramGB = 0.008;
         }
+
+        setSpecs({
+          cpuName,
+          cpuScore,
+          gpuName,
+          gpuScore,
+          ramGB: derivedRamGB,
+          vramGB: derivedVramGB,
+          storageGB,
+          isSSD: !modelLower.includes("g3") && !modelLower.includes("g4") && !modelLower.includes("g5") && !modelLower.includes("emac"),
+          os: appleFamily === "apple_silicon"
+            ? "macOS Sequoia"
+            : appleFamily === "intel_legacy"
+            ? "macOS Monterey / Ventura"
+            : "Mac OS 9 / Classic Mac OS X"
+        });
       } else {
         const { cpuScore, gpuScore, defaultVram } = estimateHardwareScores(customCpu, customGpu);
         const derivedOS = osName === "Linux" ? `Linux (${linuxDistro})` : osName;
@@ -603,53 +772,499 @@ export default function App() {
         });
       }
     } else if (deviceType === "console") {
-      const modelItem = CONSOLE_MODELS[consoleBrand]?.find(m => m.id === consoleModel);
-      if (modelItem) {
-        setSpecs({
-          cpuName: modelItem.cpu,
-          cpuScore: modelItem.cpuScore,
-          gpuName: modelItem.gpu,
-          gpuScore: modelItem.gpuScore,
-          ramGB: modelItem.ramGB,
-          vramGB: modelItem.vramGB,
-          storageGB: modelItem.storageGB,
-          isSSD: modelItem.storageType.toLowerCase().includes("ssd") || modelItem.storageType.toLowerCase().includes("flash") || modelItem.storageType.toLowerCase().includes("integrated"),
-          os: `${consoleBrand.toUpperCase()} OS`
-        });
+      const name = consoleModel;
+      const lower = name.toLowerCase();
+      let cpuName = "Console Processor";
+      let cpuScore = 5.0;
+      let gpuName = "Console Graphics";
+      let gpuScore = 5.0;
+      let ram = 16;
+      let vram = 8;
+      let storage = 1000;
+      let isSSD = false;
+
+      if (lower.includes("playstation 5 pro")) {
+        cpuName = "Custom AMD Zen 2 @ 3.85 GHz";
+        cpuScore = 8.5;
+        gpuName = "Custom RDNA 3/4 (16.7 TFLOPS)";
+        gpuScore = 9.0;
+        ram = 16; vram = 18; storage = 2000; isSSD = true;
+      } else if (lower.includes("playstation 5")) {
+        cpuName = "Custom AMD Zen 2 (8-core)";
+        cpuScore = 7.8;
+        gpuName = "Custom RDNA 2 (10.28 TFLOPS)";
+        gpuScore = 8.0;
+        ram = 16; vram = 16; storage = 825; isSSD = true;
+      } else if (lower.includes("playstation 4 pro")) {
+        cpuName = "Semi-custom AMD Jaguar @ 2.13 GHz";
+        cpuScore = 6.2;
+        gpuName = "AMD GCN (4.2 TFLOPS)";
+        gpuScore = 6.8;
+        ram = 8; vram = 8; storage = 1000;
+      } else if (lower.includes("playstation 4")) {
+        cpuName = "Semi-custom AMD Jaguar (8 cores)";
+        cpuScore = 5.5;
+        gpuName = "AMD GCN @ 1.84 TFLOPS";
+        gpuScore = 5.5;
+        ram = 8; vram = 8; storage = 1000;
+      } else if (lower.includes("playstation 3")) {
+        cpuName = "Cell Broadband Engine @ 3.2 GHz";
+        cpuScore = 4.2;
+        gpuName = "NVIDIA RSX Reality Synthesizer";
+        gpuScore = 4.0;
+        ram = 0.256; vram = 0.256; storage = 500;
+      } else if (lower.includes("playstation 2")) {
+        cpuName = "Emotion Engine @ 294 MHz";
+        cpuScore = 1.2;
+        gpuName = "Graphics Synthesizer";
+        gpuScore = 1.2;
+        ram = 0.032; vram = 0.004; storage = 40;
+      } else if (lower.includes("playstation 1") || lower.includes("ps one")) {
+        cpuName = "MIPS R3000A";
+        cpuScore = 0.5;
+        gpuName = "Sony GPU (3D geometry)";
+        gpuScore = 0.5;
+        ram = 0.002; vram = 0.001; storage = 0.001;
+      } else if (lower.includes("xbox series x")) {
+        cpuName = "Custom AMD Zen 2 (8 Cores @ 3.8 GHz)";
+        cpuScore = 8.0;
+        gpuName = "Custom RDNA 2 (12 TFLOPS)";
+        gpuScore = 8.2;
+        ram = 16; vram = 16; storage = 1000; isSSD = true;
+      } else if (lower.includes("xbox series s")) {
+        cpuName = "Custom AMD Zen 2 (8 Cores @ 3.6 GHz)";
+        cpuScore = 7.5;
+        gpuName = "Custom RDNA 2 (4 TFLOPS)";
+        gpuScore = 6.2;
+        ram = 10; vram = 10; storage = 512; isSSD = true;
+      } else if (lower.includes("xbox one x")) {
+        cpuName = "Custom AMD Jaguar (8 Cores @ 2.3 GHz)";
+        cpuScore = 6.5;
+        gpuName = "AMD Scorpio GPU @ 6 TFLOPS";
+        gpuScore = 7.0;
+        ram = 12; vram = 12; storage = 1000;
+      } else if (lower.includes("xbox one s") || lower.includes("xbox one s all-digital")) {
+        cpuName = "AMD Jaguar (8 Cores @ 1.75 GHz)";
+        cpuScore = 5.3;
+        gpuName = "AMD Durango GPU @ 1.4 TFLOPS";
+        gpuScore = 5.2;
+        ram = 8; vram = 8; storage = 1000;
+      } else if (lower.includes("xbox one")) {
+        cpuName = "AMD Jaguar (8 Cores @ 1.75 GHz)";
+        cpuScore = 5.2;
+        gpuName = "AMD Durango GPU @ 1.31 TFLOPS";
+        gpuScore = 5.0;
+        ram = 8; vram = 8; storage = 500;
+      } else if (lower.includes("xbox 360")) {
+        cpuName = "IBM Xenon (3 cores @ 3.2 GHz)";
+        cpuScore = 3.8;
+        gpuName = "ATI Xenos @ 500 MHz";
+        gpuScore = 3.8;
+        ram = 0.5; vram = 0.5; storage = 250;
+      } else if (lower.includes("xbox (original)")) {
+        cpuName = "Intel Mobile Celeron @ 733 MHz";
+        cpuScore = 1.0;
+        gpuName = "NVIDIA NV2A";
+        gpuScore = 1.0;
+        ram = 0.064; vram = 0.064; storage = 8;
+      } else if (lower.includes("switch oled") || lower.includes("switch (v1)") || lower.includes("switch (v2)")) {
+        cpuName = "NVIDIA Tegra X1 Mariko";
+        cpuScore = 5.1;
+        gpuName = "NVIDIA Maxwell (256 Cores)";
+        gpuScore = 5.1;
+        ram = 4; vram = 4; storage = 64;
+      } else if (lower.includes("wii u")) {
+        cpuName = "IBM 'Espresso' (3-core)";
+        cpuScore = 4.0;
+        gpuName = "AMD Radeon 'Latte'";
+        gpuScore = 4.2;
+        ram = 2; vram = 1; storage = 32;
+      } else if (lower.includes("wii")) {
+        cpuName = "IBM PowerPC 'Broadway'";
+        cpuScore = 2.2;
+        gpuName = "ATI 'Hollywood'";
+        gpuScore = 2.2;
+        ram = 0.088; vram = 0.024; storage = 0.5;
+      } else if (lower.includes("gamecube")) {
+        cpuName = "IBM PowerPC 'Gekko'";
+        cpuScore = 1.8;
+        gpuName = "ATI 'Flipper'";
+        gpuScore = 1.8;
+        ram = 0.043; vram = 0.016; storage = 0.016;
+      } else if (lower.includes("nintendo 64")) {
+        cpuName = "NEC VR4300";
+        cpuScore = 1.0;
+        gpuName = "SGI Reality Coprocessor";
+        gpuScore = 1.0;
+        ram = 0.004; vram = 0.004; storage = 0.064;
+      } else if (lower.includes("snes")) {
+        cpuName = "Ricoh 5A22";
+        cpuScore = 0.4;
+        gpuName = "S-PPU1 & S-PPU2";
+        gpuScore = 0.4;
+        ram = 0.000128; vram = 0.000064; storage = 0.004;
+      } else if (lower.includes("nes")) {
+        cpuName = "Ricoh 2A03 (NMOS)";
+        cpuScore = 0.2;
+        gpuName = "Nintendo PPU";
+        gpuScore = 0.2;
+        ram = 0.000002; vram = 0.000002; storage = 0.0005;
+      } else if (lower.includes("dreamcast")) {
+        cpuName = "Hitachi SH-4 @ 200 MHz";
+        cpuScore = 3.2;
+        gpuName = "NEC PowerVR2 CLX2 @ 100 MHz";
+        gpuScore = 3.2;
+        ram = 0.016; vram = 0.008; storage = 0.002;
+      } else if (lower.includes("saturn")) {
+        cpuName = "Hitachi SH-2 (2 Cores @ 28.6 MHz)";
+        cpuScore = 2.2;
+        gpuName = "VDP1 & VDP2";
+        gpuScore = 2.2;
+        ram = 0.002; vram = 0.0015; storage = 0.002;
+      } else if (lower.includes("genesis") || lower.includes("nomad")) {
+        cpuName = "Motorola 68000 @ 7.67 MHz";
+        cpuScore = 0.8;
+        gpuName = "Sega VDP";
+        gpuScore = 0.8;
+        ram = 0.000064; vram = 0.000064; storage = 0.004;
+      } else if (lower.includes("sega cd")) {
+        cpuName = "Motorola 68000 @ 12.5 MHz";
+        cpuScore = 1.0;
+        gpuName = "Sega CD ASIC custom scaler";
+        gpuScore = 1.0;
+        ram = 0.000512; vram = 0.000256; storage = 0.001;
+      } else if (lower.includes("32x")) {
+        cpuName = "Hitachi SH-2 @ 23 MHz";
+        cpuScore = 1.4;
+        gpuName = "Sega 32X Custom 3D engine";
+        gpuScore = 1.4;
+        ram = 0.000256; vram = 0.000256; storage = 0.004;
+      } else if (lower.includes("jaguar cd")) {
+        cpuName = "Motorola 68000 Tom @ 26.59 MHz";
+        cpuScore = 1.8;
+        gpuName = "Tom graphics Engine";
+        gpuScore = 1.8;
+        ram = 0.002; vram = 0.002; storage = 0.790;
+      } else if (lower.includes("jaguar")) {
+        cpuName = "Motorola 68000 / Tom / Jerry";
+        cpuScore = 1.8;
+        gpuName = "Tom Graphics @ 26.59 MHz";
+        gpuScore = 1.8;
+        ram = 0.002; vram = 0.002; storage = 0.006;
+      } else if (lower.includes("atari 7800")) {
+        cpuName = "Atari SALLY 6502";
+        cpuScore = 0.3;
+        gpuName = "Atari MARIA Custom";
+        gpuScore = 0.3;
+        ram = 0.000004; vram = 0.000004; storage = 0.000048;
+      } else if (lower.includes("atari 5200")) {
+        cpuName = "MOS Technology 6502C";
+        cpuScore = 0.2;
+        gpuName = "ANTIC & GTIA";
+        gpuScore = 0.2;
+        ram = 0.000016; vram = 0.000016; storage = 0.000032;
+      } else if (lower.includes("atari 2600")) {
+        cpuName = "MOS Technology 6507";
+        cpuScore = 0.1;
+        gpuName = "TIA Custom chip";
+        gpuScore = 0.1;
+        ram = 0.000000128; vram = 0.000000128; storage = 0.000004;
+      } else {
+        cpuName = "Processor " + name;
+        cpuScore = 1.5;
+        gpuName = "Graphics " + name;
+        gpuScore = 1.5;
+        ram = 0.016; vram = 0.016; storage = 4;
       }
+
+      setSpecs({
+        cpuName,
+        cpuScore,
+        gpuName,
+        gpuScore,
+        ramGB: ram,
+        vramGB: vram,
+        storageGB: storage,
+        isSSD,
+        os: `${consoleBrand.toUpperCase()} OS`
+      });
     } else if (deviceType === "handheld") {
-      const modelItem = HANDHELD_MODELS[handheldBrand]?.find(m => m.id === handheldModel);
-      if (modelItem) {
-        setSpecs({
-          cpuName: modelItem.cpu,
-          cpuScore: modelItem.cpuScore,
-          gpuName: modelItem.gpu,
-          gpuScore: modelItem.gpuScore,
-          ramGB: modelItem.ramGB,
-          vramGB: modelItem.vramGB,
-          storageGB: modelItem.storageGB,
-          isSSD: modelItem.storageType.toLowerCase().includes("ssd") || modelItem.storageType.toLowerCase().includes("flash"),
-          os: `${handheldBrand.toUpperCase()} OS`
-        });
+      const name = handheldModel;
+      const lower = name.toLowerCase();
+      let cpuName = "Handheld APU";
+      let cpuScore = 5.0;
+      let gpuName = "Handheld GPU";
+      let gpuScore = 5.0;
+      let ram = 16;
+      let vram = 4;
+      let storage = 512;
+      let isSSD = true;
+
+      if (lower.includes("steam deck oled")) {
+        cpuName = "AMD Sephiroth (6nm Zen 2)";
+        cpuScore = 6.0;
+        gpuName = "AMD RDNA 2 Custom (8 CUs)";
+        gpuScore = 5.5;
+        ram = 16; vram = 16; storage = 512;
+      } else if (lower.includes("steam deck lcd")) {
+        cpuName = "AMD Aerith (7nm Zen 2)";
+        cpuScore = 5.5;
+        gpuName = "AMD RDNA 2 Custom (8 CUs)";
+        gpuScore = 5.1;
+        ram = 16; vram = 16; storage = 256;
+      } else if (lower.includes("rog ally (z1 extreme)") || lower.includes("legion go")) {
+        cpuName = "AMD Ryzen Z1 Extreme";
+        cpuScore = 7.2;
+        gpuName = "AMD Radeon 780M";
+        gpuScore = 6.8;
+        ram = 16; vram = 16; storage = 512;
+      } else if (lower.includes("rog ally (z1 non-extreme)")) {
+        cpuName = "AMD Ryzen Z1 (6-core)";
+        cpuScore = 6.5;
+        gpuName = "AMD Radeon 740M";
+        gpuScore = 5.8;
+        ram = 16; vram = 16; storage = 512;
+      } else if (lower.includes("psp-1000")) {
+        cpuName = "MIPS R4000 @ 333 MHz";
+        cpuScore = 1.5;
+        gpuName = "Sony Custom GPU @ 166 MHz";
+        gpuScore = 1.5;
+        ram = 0.032; vram = 0.002; storage = 0.032; isSSD = false;
+      } else if (lower.includes("psp-2000") || lower.includes("psp-3000") || lower.includes("psp go") || lower.includes("psp street")) {
+        cpuName = "MIPS R4000 @ 333 MHz";
+        cpuScore = 1.6;
+        gpuName = "Sony Custom GPU";
+        gpuScore = 1.6;
+        ram = 0.064; vram = 0.002; storage = 16; isSSD = false;
+      } else if (lower.includes("vita 1000")) {
+        cpuName = "ARM Cortex-A9 MPCore @ 444 MHz";
+        cpuScore = 3.0;
+        gpuName = "PowerVR SGX543MP4+";
+        gpuScore = 3.0;
+        ram = 0.512; vram = 0.128; storage = 4; isSSD = false;
+      } else if (lower.includes("vita 2000")) {
+        cpuName = "ARM Cortex-A9 MPCore @ 444 MHz";
+        cpuScore = 3.0;
+        gpuName = "PowerVR SGX543MP4+";
+        gpuScore = 3.0;
+        ram = 0.512; vram = 0.128; storage = 1; isSSD = false;
+      } else if (lower.includes("playstation portal")) {
+        cpuName = "Snapdragon 662 Octa-Core";
+        cpuScore = 4.8;
+        gpuName = "Qualcomm Adreno 610";
+        gpuScore = 4.5;
+        ram = 6; vram = 2; storage = 16;
+      } else if (lower.includes("game boy color")) {
+        cpuName = "Sharp LR35902 @ 8.38 MHz";
+        cpuScore = 0.4;
+        gpuName = "Nintendo Color Graphics";
+        gpuScore = 0.4;
+        ram = 0.000032; vram = 0.000016; storage = 0.001; isSSD = false;
+      } else if (lower.includes("game boy advance") || lower.includes("gba")) {
+        cpuName = "ARM7TDMI @ 16.78 MHz";
+        cpuScore = 0.8;
+        gpuName = "Custom 2D Graphics Hardware";
+        gpuScore = 0.8;
+        ram = 0.000288; vram = 0.000096; storage = 0.004; isSSD = false;
+      } else if (lower.includes("game boy") || lower.includes("pocket") || lower.includes("light")) {
+        cpuName = "Sharp LR35902 @ 4.19 MHz";
+        cpuScore = 0.2;
+        gpuName = "Nintendo LCD Custom";
+        gpuScore = 0.2;
+        ram = 0.000008; vram = 0.000008; storage = 0.000256; isSSD = false;
+      } else if (lower.includes("nintendo ds lite") || lower.includes("nintendo ds")) {
+        cpuName = "ARM946E-S @ 67 MHz";
+        cpuScore = 1.4;
+        gpuName = "Custom 3D Rasterizer";
+        gpuScore = 1.4;
+        ram = 0.004; vram = 0.000656; storage = 0.256; isSSD = false;
+      } else if (lower.includes("dsi")) {
+        cpuName = "ARM9 @ 133 MHz";
+        cpuScore = 1.8;
+        gpuName = "Custom 2D/3D hardware";
+        gpuScore = 1.8;
+        ram = 0.016; vram = 0.001; storage = 0.256; isSSD = false;
+      } else if (lower.includes("3ds max") || lower.includes("3ds xl") || lower.includes("3ds") || lower.includes("2ds")) {
+        cpuName = "ARM11 Dual-Core @ 268 MHz";
+        cpuScore = 2.8;
+        gpuName = "DMP PICA200 @ 200 MHz";
+        gpuScore = 2.8;
+        ram = 0.128; vram = 0.006; storage = 4; isSSD = false;
+      } else if (lower.includes("new nintendo 3ds") || lower.includes("new nintendo 2ds")) {
+        cpuName = "ARM11 Quad-Core @ 804 MHz";
+        cpuScore = 3.5;
+        gpuName = "DMP PICA200";
+        gpuScore = 3.5;
+        ram = 0.256; vram = 0.010; storage = 4; isSSD = false;
+      } else if (lower.includes("switch lite")) {
+        cpuName = "NVIDIA Tegra X1 Mariko";
+        cpuScore = 5.0;
+        gpuName = "NVIDIA Maxwell GPU";
+        gpuScore = 5.0;
+        ram = 4; vram = 4; storage = 32;
+      } else {
+        cpuName = "Processor " + name;
+        cpuScore = 3.0;
+        gpuName = "GPU " + name;
+        gpuScore = 3.0;
+        ram = 1; vram = 1; storage = 16;
       }
+
+      setSpecs({
+        cpuName,
+        cpuScore,
+        gpuName,
+        gpuScore,
+        ramGB: ram,
+        vramGB: vram,
+        storageGB: storage,
+        isSSD,
+        os: `${handheldBrand.toUpperCase()} OS`
+      });
     } else if (deviceType === "mobile") {
       if (mobileSubType === "apple-ios") {
-        const famNode = APPLE_DEVICES_TREE["iphone"];
-        const genNode = famNode?.generations[appleGen] || Object.values(famNode?.generations || {})[0];
-        const tierNode = genNode?.tiers[appleTier] || Object.values(genNode?.tiers || {})[0];
-        if (tierNode) {
-          setSpecs({
-            cpuName: tierNode.chip,
-            cpuScore: tierNode.cpuScore,
-            gpuName: tierNode.chip + " (Apple GPU)",
-            gpuScore: tierNode.gpuScore,
-            ramGB: tierNode.ram,
-            vramGB: tierNode.vram,
-            storageGB: phoneStorage,
-            isSSD: true,
-            os: "iOS System Device"
-          });
+        const name = iphoneModel;
+        const lower = name.toLowerCase();
+        let cpuName = "Apple A-Series";
+        let cpuScore = 5.0;
+        let gpuName = "Apple Graphics";
+        let gpuScore = 5.0;
+        let ram = 4;
+        let vram = 1;
+
+        if (lower.includes("iphone 17 pro max") || lower.includes("iphone 17 pro")) {
+          cpuName = "Apple A19 Pro";
+          cpuScore = 10.0;
+          gpuName = "Apple GPU @ A19 Pro";
+          gpuScore = 10.0;
+          ram = 12; vram = 6;
+        } else if (lower.includes("iphone 17")) {
+          cpuName = "Apple A19";
+          cpuScore = 9.6;
+          gpuName = "Apple GPU @ A19";
+          gpuScore = 9.4;
+          ram = 8; vram = 4;
+        } else if (lower.includes("iphone 16 pro max") || lower.includes("iphone 16 pro")) {
+          cpuName = "Apple A18 Pro";
+          cpuScore = 9.6;
+          gpuName = "Apple GPU @ A18 Pro";
+          gpuScore = 9.6;
+          ram = 8; vram = 4;
+        } else if (lower.includes("iphone 16")) {
+          cpuName = "Apple A18";
+          cpuScore = 9.2;
+          gpuName = "Apple GPU @ A18";
+          gpuScore = 8.9;
+          ram = 8; vram = 3;
+        } else if (lower.includes("iphone 15 pro max") || lower.includes("iphone 15 pro")) {
+          cpuName = "Apple A17 Pro";
+          cpuScore = 9.1;
+          gpuName = "Apple GPU @ A17 Pro";
+          gpuScore = 9.1;
+          ram = 8; vram = 3;
+        } else if (lower.includes("iphone 15")) {
+          cpuName = "Apple A16 Bionic";
+          cpuScore = 8.5;
+          gpuName = "Apple GPU @ A16";
+          gpuScore = 8.3;
+          ram = 6; vram = 2;
+        } else if (lower.includes("iphone 14 pro max") || lower.includes("iphone 14 pro")) {
+          cpuName = "Apple A16 Bionic";
+          cpuScore = 8.5;
+          gpuName = "Apple GPU @ A16";
+          gpuScore = 8.3;
+          ram = 6; vram = 2;
+        } else if (lower.includes("iphone 14")) {
+          cpuName = "Apple A15 Bionic (5-core)";
+          cpuScore = 8.1;
+          gpuName = "Apple GPU @ A15";
+          gpuScore = 8.0;
+          ram = 6; vram = 1.5;
+        } else if (lower.includes("iphone 13 pro max") || lower.includes("iphone 13 pro")) {
+          cpuName = "Apple A15 Bionic (5-core)";
+          cpuScore = 8.3;
+          gpuName = "Apple GPU @ A15";
+          gpuScore = 8.1;
+          ram = 6; vram = 1.5;
+        } else if (lower.includes("iphone 13") || lower.includes("iphone se (3rd gen)")) {
+          cpuName = "Apple A15 Bionic";
+          cpuScore = 8.0;
+          gpuName = "Apple GPU @ A15";
+          gpuScore = 7.6;
+          ram = 4; vram = 1.0;
+        } else if (lower.includes("iphone 12")) {
+          cpuName = "Apple A14 Bionic";
+          cpuScore = 7.5;
+          gpuName = "Apple GPU @ A14";
+          gpuScore = 7.4;
+          ram = 4; vram = 1.0;
+        } else if (lower.includes("iphone 11") || lower.includes("iphone se (2nd gen)")) {
+          cpuName = "Apple A13 Bionic";
+          cpuScore = 6.4;
+          gpuName = "Apple GPU @ A13";
+          gpuScore = 6.3;
+          ram = 4; vram = 0.512;
+        } else if (lower.includes("iphone xs") || lower.includes("iphone xr")) {
+          cpuName = "Apple A12 Bionic";
+          cpuScore = 6.0;
+          gpuName = "Apple GPU @ A12";
+          gpuScore = 5.8;
+          ram = 3; vram = 0.256;
+        } else if (lower.includes("iphone x") || lower.includes("iphone 8")) {
+          cpuName = "Apple A11 Bionic";
+          cpuScore = 5.3;
+          gpuName = "Apple GPU @ A11";
+          gpuScore = 5.2;
+          ram = 3; vram = 0.256;
+        } else if (lower.includes("iphone 7")) {
+          cpuName = "Apple A10 Fusion";
+          cpuScore = 4.4;
+          gpuName = "Apple GPU @ A10";
+          gpuScore = 4.2;
+          ram = 2; vram = 0.128;
+        } else if (lower.includes("iphone 6s") || lower.includes("iphone se (1st gen)")) {
+          cpuName = "Apple A9";
+          cpuScore = 3.8;
+          gpuName = "Apple GPU @ A9";
+          gpuScore = 3.6;
+          ram = 2; vram = 0.128;
+        } else if (lower.includes("iphone 6")) {
+          cpuName = "Apple A8";
+          cpuScore = 3.2;
+          gpuName = "Apple GPU @ A8";
+          gpuScore = 3.0;
+          ram = 1; vram = 0.064;
+        } else if (lower.includes("iphone 5")) {
+          cpuName = "Apple A6/A7";
+          cpuScore = 2.5;
+          gpuName = "Apple GPU @ A6";
+          gpuScore = 2.2;
+          ram = 1; vram = 0.064;
+        } else if (lower.includes("iphone 4")) {
+          cpuName = "Apple A4/A5";
+          cpuScore = 1.4;
+          gpuName = "Apple GPU @ A4";
+          gpuScore = 1.2;
+          ram = 0.5; vram = 0.016;
+        } else {
+          cpuName = "Apple Older Core";
+          cpuScore = 0.5;
+          gpuName = "PowerVR MBX";
+          gpuScore = 0.5;
+          ram = 0.128; vram = 0.008;
         }
+
+        setSpecs({
+          cpuName,
+          cpuScore,
+          gpuName,
+          gpuScore,
+          ramGB: ram,
+          vramGB: vram,
+          storageGB: phoneStorage,
+          isSSD: true,
+          os: "iOS System Device"
+        });
       } else {
         const { cpuScore, gpuScore } = estimateHardwareScores(phoneCpu, phoneGpu);
         setSpecs({
@@ -669,7 +1284,7 @@ export default function App() {
     deviceType, customCpu, customGpu, ramGB, vramGB, storageGB, storageType, osName, 
     consoleBrand, consoleModel, handheldBrand, handheldModel, phoneName, phoneCpu, 
     phoneGpu, phoneRam, phoneStorage, pcCategory, pcSubType, mobileSubType, appleFamily, 
-    appleGen, appleTier, ramGen, linuxDistro
+    appleModel, iphoneModel, ramGen, linuxDistro
   ]);
 
   // Core local diagnostic generator
@@ -833,7 +1448,10 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
     try {
       timeoutId = setTimeout(() => {
         didTimeout = true;
-        setDeepAnalysisRaw(`## Summary\nعذراً، انتهت مهلة الاتصال بخوادم Gemini. يرجى المحاولة مرة أخرى لاحقاً.\n## Best Settings\n-\n## Detailed Analysis\n-`);
+        const timeoutMsg = lang === "ar"
+          ? `انتهت مهلة الاتصال بخوادم فحص جيميناي (Gemini AI) لعدم استجابة الخادم في الوقت المحدد. يرجى محاولة الفحص مجدداً في وقت لاحق.`
+          : `Connection to the Gemini AI scan servers timed out because the server did not respond in time. Please try scanning again later.`;
+        setDeepAnalysisRaw(timeoutMsg);
         setIsDeepAnalyzing(false);
       }, 30000);
 
@@ -861,10 +1479,13 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
       if (timeoutId) clearTimeout(timeoutId);
       if (didTimeout) return;
 
-      console.warn("API Error, loading diagnostic fallback model...", err);
-      // Local fallback
-      const fallbackReport = `## Summary\nعذراً، تعذّر الاتصال بخوادم Gemini. ربما الخوادم مشغولة حالياً، يرجى المحاولة مرة أخرى لاحقاً.\n## Best Settings\n \n## Detailed Analysis\n `;
-      setDeepAnalysisRaw(fallbackReport);
+      console.warn("API Error, setting error state...", err);
+      
+      const errorMsg = lang === "ar"
+        ? `فشل الاتصال بخادم فحص جيميناي السحابي (Gemini AI). تم فحص مواصفات قطع العتاد في جهازك محلياً بشكل سليم في القسم الفوري أعلاه. يرجى محاولة الفحص السحابي مجدداً لاحقاً.`
+        : `Failed to connect to the Gemini AI cloud scan server. Your equipment was analyzed locally in the immediate section above. Please try running the cloud scan again later.`;
+        
+      setDeepAnalysisRaw(errorMsg);
     } finally {
       if (!didTimeout) {
         setIsDeepAnalyzing(false);
@@ -899,18 +1520,17 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
 
   const handleAppleFamilyChange = (fam: string) => {
     setAppleFamily(fam);
-    const gens = Object.keys(APPLE_DEVICES_TREE[fam]?.generations || {});
-    if (gens.length > 0) {
-      setAppleGen(gens[0]);
-      const tiers = Object.keys(APPLE_DEVICES_TREE[fam].generations[gens[0]]?.tiers || {});
-      if (tiers.length > 0) setAppleTier(tiers[0]);
+    if (fam === "apple_silicon") {
+      setAppleModel("MacBook Pro M3");
+    } else if (fam === "intel_legacy") {
+      setAppleModel("MacBook Pro 16\" (Intel Core i9)");
+    } else {
+      setAppleModel("Power Mac G5");
     }
   };
 
-  const handleAppleGenChange = (gen: string) => {
-    setAppleGen(gen);
-    const tiers = Object.keys(APPLE_DEVICES_TREE[appleFamily]?.generations[gen]?.tiers || {});
-    if (tiers.length > 0) setAppleTier(tiers[0]);
+  const handleAppleGenChange = (model: string) => {
+    setAppleModel(model);
   };
 
   const runHardwareAutoScan = () => {
@@ -944,8 +1564,7 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
             setPcCategory(detected.pcCategory);
             if (detected.pcCategory === "apple-mac") {
               setAppleFamily(detected.appleFamily);
-              setAppleGen(detected.appleGen);
-              setAppleTier(detected.appleTier);
+              setAppleModel(detected.appleModel || "MacBook Pro M3");
             } else {
               setPcSubType(detected.pcSubType);
               setCustomCpu(detected.cpuName);
@@ -957,18 +1576,17 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
               setMotherboardModel(detected.motherboardModel);
             }
           } else if (detected.deviceType === "mobile") {
-            setMobileSubType(detected.mobileSubType);
-            if (detected.mobileSubType === "apple-ios") {
-              setAppleFamily("iphone");
-              setAppleGen(detected.appleGen);
-              setAppleTier(detected.appleTier);
-            } else {
-              setPhoneName(detected.phoneName);
-              setPhoneCpu(detected.phoneCpu);
-              setPhoneGpu(detected.phoneGpu);
-              setPhoneRam(detected.phoneRam);
-              setPhoneStorage(detected.phoneStorage);
-            }
+             setMobileSubType(detected.mobileSubType);
+             if (detected.mobileSubType === "apple-ios") {
+               setAppleFamily("iphone");
+               setIphoneModel(detected.iphoneModel || "iPhone 15 Pro Max");
+             } else {
+               setPhoneName(detected.phoneName);
+               setPhoneCpu(detected.phoneCpu);
+               setPhoneGpu(detected.phoneGpu);
+               setPhoneRam(detected.phoneRam);
+               setPhoneStorage(detected.phoneStorage);
+             }
           }
         }
         setAutoScanStatus("success");
@@ -1302,28 +1920,25 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                     </>
                   ) : (
                     /* Apple Silicon selectors */
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30 text-right">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30 text-right">
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.appleFamilyLabel}</label>
                         <select value={appleFamily} onChange={(e) => handleAppleFamilyChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
-                          {Object.entries(APPLE_DEVICES_TREE).filter(([k]) => k !== "iphone").map(([k, f]: [string, any]) => (
-                            <option key={k} value={k}>{lang === "ar" ? f.name_ar : f.name_en}</option>
-                          ))}
+                          <option value="apple_silicon">{lang === "ar" ? "معالجات Apple Silicon (M1-M4)" : "Apple Silicon Core (M1-M4)"}</option>
+                          <option value="intel_legacy">{lang === "ar" ? "معالجات Intel Mac القديمة" : "Intel-based Legacy Mac"}</option>
+                          <option value="powerpc_legacy">{lang === "ar" ? "معالجات PowerPC القديمة (G3-G5)" : "Legacy PowerPC Mac (G3-G5)"}</option>
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-mono text-cyan-400">{t.appleGenLabel}</label>
-                        <select value={appleGen} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
-                          {Object.entries(APPLE_DEVICES_TREE[appleFamily]?.generations || {}).map(([k, g]: [string, any]) => (
-                            <option key={k} value={k}>{lang === "ar" ? g.name_ar : g.name_en}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-mono text-cyan-400">{t.appleTierLabel}</label>
-                        <select value={appleTier} onChange={(e) => setAppleTier(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
-                          {Object.entries(APPLE_DEVICES_TREE[appleFamily]?.generations[appleGen]?.tiers || {}).map(([k, tier]: [string, any]) => (
-                            <option key={k} value={k}>{lang === "ar" ? tier.name_ar || tier.name : tier.name}</option>
+                        <label className="text-[10px] font-mono text-cyan-400">{lang === "ar" ? "موديل الجهاز" : "Mac Device Model"}</label>
+                        <select value={appleModel} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
+                          {(appleFamily === "apple_silicon"
+                            ? MAC_MODELS.apple_silicon
+                            : appleFamily === "intel_legacy"
+                            ? MAC_MODELS.intel_era
+                            : MAC_MODELS.powerpc_era
+                          ).map(m => (
+                            <option key={m} value={m}>{m}</option>
                           ))}
                         </select>
                       </div>
@@ -1378,14 +1993,14 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5 animate-fade-in text-right">
                     <label className="text-[10px] font-mono text-cyan-400">{t.brandLabel}</label>
-                    <select value={consoleBrand} onChange={(e) => { setConsoleBrand(e.target.value); const models = CONSOLE_MODELS[e.target.value] || []; if (models.length > 0) setConsoleModel(models[0].id); }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                    <select value={consoleBrand} onChange={(e) => { setConsoleBrand(e.target.value); const models = CONSOLE_MODELS[e.target.value] || []; if (models.length > 0) setConsoleModel(models[0]); }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
                       {CONSOLE_BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5 animate-fade-in text-right">
                     <label className="text-[10px] font-mono text-cyan-400">{t.modelLabel}</label>
                     <select value={consoleModel} onChange={(e) => setConsoleModel(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                      {(CONSOLE_MODELS[consoleBrand] || []).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      {(CONSOLE_MODELS[consoleBrand] || []).map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1396,14 +2011,14 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5 animate-fade-in text-right">
                     <label className="text-[10px] font-mono text-cyan-400">{t.brandLabel}</label>
-                    <select value={handheldBrand} onChange={(e) => { setHandheldBrand(e.target.value); const models = HANDHELD_MODELS[e.target.value] || []; if (models.length > 0) setHandheldModel(models[0].id); }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                    <select value={handheldBrand} onChange={(e) => { setHandheldBrand(e.target.value); const models = HANDHELD_MODELS[e.target.value] || []; if (models.length > 0) setHandheldModel(models[0]); }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
                       {HANDHELD_BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5 animate-fade-in text-right">
                     <label className="text-[10px] font-mono text-cyan-400">{t.modelLabel}</label>
                     <select value={handheldModel} onChange={(e) => setHandheldModel(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                      {(HANDHELD_MODELS[handheldBrand] || []).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                      {(HANDHELD_MODELS[handheldBrand] || []).map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1416,29 +2031,19 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                     <label className="text-[10px] font-mono text-cyan-400">{t.mobilePlatformLabel}</label>
                     <div className="grid grid-cols-2 gap-2 bg-gray-950 p-1.5 rounded-xl border border-gray-850">
                       <button type="button" onClick={() => setMobileSubType("android")} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${mobileSubType === "android" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-gray-500"}`}>{t.androidOpt}</button>
-                      <button type="button" onClick={() => { setMobileSubType("apple-ios"); setAppleFamily("iphone"); setAppleGen("iphone-15"); setAppleTier("pro"); }} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${mobileSubType === "apple-ios" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-gray-500"}`}>{t.appleIosOpt}</button>
+                      <button type="button" onClick={() => { setMobileSubType("apple-ios"); setIphoneModel("iPhone 15 Pro Max"); }} className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer ${mobileSubType === "apple-ios" ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : "text-gray-500"}`}>{t.appleIosOpt}</button>
                     </div>
                   </div>
 
                   {mobileSubType === "apple-ios" ? (
                     <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30 text-right">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-mono text-cyan-400">{t.appleGenLabel}</label>
-                          <select value={appleGen} onChange={(e) => handleAppleGenChange(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                            {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations || {}).map(([k, g]: [string, any]) => (
-                              <option key={k} value={k}>{lang === "ar" ? g.name_ar : g.name_en}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-mono text-cyan-400">{t.appleTierLabel}</label>
-                          <select value={appleTier} onChange={(e) => setAppleTier(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                            {Object.entries(APPLE_DEVICES_TREE["iphone"]?.generations[appleGen]?.tiers || {}).map(([k, tier]: [string, any]) => (
-                              <option key={k} value={k}>{lang === "ar" ? tier.name_ar || tier.name : tier.name}</option>
-                            ))}
-                          </select>
-                        </div>
+                      <div className="flex flex-col gap-1.5 bg-cyan-950/10 p-4 rounded-xl border border-cyan-900/30 text-right">
+                        <label className="text-[10px] font-mono text-cyan-400">{lang === "ar" ? "موديل الآيفون" : "iPhone Model Selection"}</label>
+                        <select value={iphoneModel} onChange={(e) => setIphoneModel(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full text-gray-250">
+                          {IPHONE_MODELS.map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-mono text-cyan-400">{t.internalAllocatedStorage}</label>
@@ -1446,6 +2051,8 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                           <option value="64">64 GB Storage</option>
                           <option value="128">128 GB Storage</option>
                           <option value="256">256 GB Storage</option>
+                          <option value="512">512 GB Storage</option>
+                          <option value="1024">1024 GB Storage</option>
                         </select>
                       </div>
                     </>
@@ -1617,6 +2224,20 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
 
                   {(() => {
                     const parsed = parseAiScanReport(deepAnalysisRaw);
+                    const isError = !parsed.bestSettings && !parsed.detailedAnalysis;
+                    if (isError) {
+                      return (
+                        <div className="bg-[#1b0a0a]/70 border border-red-900/40 p-4 rounded-xl flex items-start gap-3 flex-row-reverse text-right">
+                          <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="text-red-400 font-bold text-xs mb-1 text-right">
+                              {lang === "ar" ? "فشل الاتصال بالذكاء الاصطناعي" : "AI Scan Connection Error"}
+                            </h4>
+                            <p className="text-gray-300 text-xs leading-relaxed text-right">{parsed.summary}</p>
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <div className="flex flex-col gap-4">
                         <div className="bg-[#060810]/70 border border-gray-850 p-4 rounded-xl">
