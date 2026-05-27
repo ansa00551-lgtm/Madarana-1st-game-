@@ -23,7 +23,6 @@ import {
   RotateCcw, 
   ExternalLink 
 } from "lucide-react";
-import { UAParser } from "ua-parser-js";
 
 import { Game, SystemSpecs, AnalysisResult } from "./types";
 import { 
@@ -368,17 +367,14 @@ export default function App() {
   // Setup simulated automatic scan function
   useEffect(() => {
     (window as any).smartHardwareScan = () => {
-      const parser = new UAParser();
-      const res = parser.getResult();
       const ua = navigator.userAgent.toLowerCase();
       
       let device: "desktop" | "mobile" | "console" | "handheld" = "desktop";
       let isApple = /ipad|iphone|macintosh|mac os x/.test(ua);
       let isAndroid = /android/.test(ua);
 
-      if (/iphone|ipad/.test(ua) || res.device.type === "mobile" || res.device.type === "tablet") {
-        device = "mobile";
-      } else if (isAndroid) {
+      const isMobileUA = /mobile|iphone|ipad|ipod|android|blackberry|opera mini|iemobile|webos/i.test(ua);
+      if (isMobileUA) {
         device = "mobile";
       }
 
@@ -452,8 +448,14 @@ export default function App() {
 
       if (isApple) {
         if (/iphone|ipad/.test(ua)) {
-          const modelString = res.device.model || "";
-          const displayModel = modelString ? `iPhone ${modelString}` : "iPhone 15 Pro Max";
+          let detectedModel = "iPhone 15 Pro Max";
+          if (ua.includes("cpu iphone os 17") || ua.includes("cpu iphone os 18")) {
+            detectedModel = "iPhone 15 Pro Max";
+          } else if (ua.includes("cpu iphone os 16")) {
+            detectedModel = "iPhone 14 Pro Max";
+          } else if (ua.includes("cpu iphone os 15")) {
+            detectedModel = "iPhone 13 Pro Max";
+          }
           return {
             deviceType: "mobile",
             mobileSubType: "apple-ios",
@@ -468,8 +470,8 @@ export default function App() {
             motherboardModel: "",
             appleFamily: "iphone",
             appleModel: "MacBook Pro M3",
-            iphoneModel: "iPhone 15 Pro Max",
-            phoneName: displayModel,
+            iphoneModel: detectedModel,
+            phoneName: detectedModel,
             phoneCpu: "Apple A17 Pro",
             phoneGpu: "Apple A17 Pro (Apple GPU)",
             phoneRam: 8,
@@ -523,8 +525,23 @@ export default function App() {
       }
 
       if (isAndroid) {
-        const vendor = res.device.vendor || "Samsung";
-        const model = res.device.model || "Galaxy S24 Ultra";
+        let vendor = "Samsung";
+        let model = "Galaxy S24 Ultra";
+        
+        if (ua.includes("huawei") || ua.includes("honor")) {
+          vendor = "Huawei";
+          model = "P60 Pro";
+        } else if (ua.includes("xiaomi") || ua.includes("mi ") || ua.includes("redmi")) {
+          vendor = "Xiaomi";
+          model = "14 Pro";
+        } else if (ua.includes("google") || ua.includes("pixel")) {
+          vendor = "Google";
+          model = "Pixel 8 Pro";
+        } else if (ua.includes("oneplus")) {
+          vendor = "OnePlus";
+          model = "12";
+        }
+        
         return {
           deviceType: "mobile",
           mobileSubType: "android",
