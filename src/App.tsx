@@ -338,6 +338,98 @@ export default function App() {
 
   const [consoleBrand, setConsoleBrand] = useState("sony");
   const [consoleModel, setConsoleModel] = useState("PlayStation 5 (Base/Fat)");
+  const [consoleRamGen, setConsoleRamGen] = useState<string>("GDDR6 (Modern Unified System RAM)");
+  const [consoleOS, setConsoleOS] = useState<string>("PlayStation 5 System Software");
+
+  const updateConsoleDefaults = (model: string) => {
+    const lower = model.toLowerCase();
+    
+    let osDefault = "PlayStation 5 System Software";
+    let ramDefault = "GDDR6 (Modern Unified System RAM)";
+    
+    if (lower.includes("playstation 5 pro")) {
+      osDefault = "PlayStation 5 System Software (Firmware 10.x+)";
+      ramDefault = "GDDR6 (16GB Unified) + 2GB DDR4 (Background OS)";
+    } else if (lower.includes("playstation 5")) {
+      osDefault = "PlayStation 5 System Software";
+      ramDefault = "GDDR6 (Modern Unified System RAM)";
+    } else if (lower.includes("playstation 4 pro")) {
+      osDefault = "PlayStation 4 Orbis OS";
+      ramDefault = "GDDR5 (Unified) + 1GB DDR3 (Background RAM)";
+    } else if (lower.includes("playstation 4")) {
+      osDefault = "PlayStation 4 Orbis OS (FreeBSD Custom kernel)";
+      ramDefault = "Unified GDDR5 RAM";
+    } else if (lower.includes("playstation 3")) {
+      osDefault = "PS3 Cell OS (XMB - XrossMediaBar)";
+      ramDefault = "256MB XDR System RAM + 256MB GDDR3 VRAM";
+    } else if (lower.includes("playstation 2")) {
+      osDefault = "PlayStation 2 Boot ROM OS";
+      ramDefault = "Direct RDRAM (Rambus System Memory)";
+    } else if (lower.includes("playstation 1")) {
+      osDefault = "PlayStation 1 Native BIOS Firmware";
+      ramDefault = "System RAM (EDO DRAM)";
+    } else if (lower.includes("xbox series x")) {
+      osDefault = "Xbox Series OS (Xbox System Software)";
+      ramDefault = "GDDR6 (16GB Split Bus Media Architecture)";
+    } else if (lower.includes("xbox series s")) {
+      osDefault = "Xbox Series OS (Xbox System Software)";
+      ramDefault = "GDDR6 (10GB Split Bus Architecture)";
+    } else if (lower.includes("xbox one x")) {
+      osDefault = "Xbox One OS (Microsoft Hyper-V dual OS)";
+      ramDefault = "GDDR5 (12GB High-Speed System RAM)";
+    } else if (lower.includes("xbox one s") || lower.includes("xbox one")) {
+      osDefault = "Xbox One OS (Microsoft Hyper-V dual OS)";
+      ramDefault = "DDR3 (Unified RAM) + 32MB eSRAM Cache";
+    } else if (lower.includes("xbox 360")) {
+      osDefault = "Xbox 360 Dashboard OS (Yaris Core)";
+      ramDefault = "GDDR3 (Unified System Memory)";
+    } else if (lower.includes("xbox (original)")) {
+      osDefault = "Xbox OS (Custom Windows 2000 Kernel)";
+      ramDefault = "DDR SDRAM (Unified)";
+    } else if (lower.includes("switch")) {
+      osDefault = "Nintendo Horizon OS (Custom FreeBSD kernel)";
+      ramDefault = "LPDDR4 (Shared System / Graphics Memory)";
+    } else if (lower.includes("wii u")) {
+      osDefault = "Wii U Menu (Cafe OS)";
+      ramDefault = "DDR3 (Unified MEM2 RAM)";
+    } else if (lower.includes("wii")) {
+      osDefault = "Wii Menu (Starlet IOS)";
+      ramDefault = "GDDR3 (MEM1 + MEM2 System RAM)";
+    } else if (lower.includes("gamecube")) {
+      osDefault = "Nintendo Dolphin Core BIOS";
+      ramDefault = "1T-SRAM System Memory";
+    } else if (lower.includes("nintendo 64")) {
+      osDefault = "N64 Native Cartridge Boot ROM";
+      ramDefault = "Rambus RDRAM (High-bandwidth)";
+    } else if (lower.includes("snes")) {
+      osDefault = "SNES Hardware Kernel";
+      ramDefault = "DRAM System Memory";
+    } else if (lower.includes("nes")) {
+      osDefault = "NES PPU BIOS Engine";
+      ramDefault = "DRAM Memory";
+    } else if (lower.includes("dreamcast")) {
+      osDefault = "Sega Katana OS / Windows CE";
+      ramDefault = "SDRAM System Memory";
+    } else if (lower.includes("saturn")) {
+      osDefault = "Sega Saturn Real-time BIOS";
+      ramDefault = "SDRAM + VRAM Dual Bus Architecture";
+    } else if (lower.includes("genesis")) {
+      osDefault = "Sega Genesis Motherboard BIOS";
+      ramDefault = "DRAM System RAM";
+    } else if (lower.includes("32x")) {
+      osDefault = "Sega 32X BIOS Extension";
+      ramDefault = "DRAM Dual-port Memory";
+    } else if (lower.includes("jaguar")) {
+      osDefault = "Atari Jaguar Custom Boot OS";
+      ramDefault = "DRAM Unified Fast RAM";
+    } else if (lower.includes("atari")) {
+      osDefault = "Atari Cartridge Memory Mapping";
+      ramDefault = "DRAM Static RAM";
+    }
+    
+    setConsoleOS(osDefault);
+    setConsoleRamGen(ramDefault);
+  };
   const [handheldBrand, setHandheldBrand] = useState("valve");
   const [handheldModel, setHandheldModel] = useState("Steam Deck OLED");
 
@@ -1003,7 +1095,7 @@ export default function App() {
         vramGB: vram,
         storageGB: storage,
         isSSD,
-        os: `${consoleBrand.toUpperCase()} OS`
+        os: consoleOS
       });
     } else if (deviceType === "handheld") {
       const name = handheldModel;
@@ -1449,9 +1541,10 @@ export default function App() {
 You are a highly detailed and precise Gaming Compatibility System Expert.
 Analyze the compatibility between:
 - Game Name: ${selectedGame.name}
-- System CPU: ${specs.cpuName}
-- System GPU: ${specs.gpuName}
-- System RAM: ${specs.ramGB} GB
+- System CPU: ${specs.cpuName} (Overclocked: ${isOverclocked ? 'Yes' : 'No'})
+- System GPU: ${specs.gpuName} (VRAM: ${specs.vramGB} GB)
+- System RAM: ${specs.ramGB} GB (Type/Generation: ${deviceType === "console" ? consoleRamGen : ramGen})
+- System OS: ${specs.os}
 - System storage: ${specs.storageGB} GB (Type: ${storageType})
 - Category Device: ${deviceType.toUpperCase()}
 
@@ -1808,12 +1901,20 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                   <span>{autoScanStatus === "running" ? t.autoScanRunning : autoScanStatus === "success" ? t.autoScanSuccess : t.autoScanBtn}</span>
                 </button>
                 {scanLogs.length > 0 && (
-                  <div className="bg-black/70 border border-gray-900 rounded-lg p-3 font-mono text-[10px] text-zinc-400 flex flex-col gap-0.5 text-left" dir="ltr">
+                  <div className="bg-black/70 border border-gray-900 rounded-lg p-3 font-mono text-[10px] text-zinc-400 flex flex-col gap-0.5 text-left animate-fade-in" dir="ltr">
                     {scanLogs.map((log, idx) => (
                       <div key={idx}>&gt; {log}</div>
                     ))}
                   </div>
                 )}
+                <div className="text-[10.5px] text-amber-500/80 leading-relaxed text-right mt-1.5 flex items-start gap-1.5 flex-row-reverse border-t border-gray-900/45 pt-2.5">
+                  <span className="text-amber-500 shrink-0 select-none">⚠️</span>
+                  <span>
+                    {lang === "ar" 
+                      ? "تنبيه دقة الفحص الرقمي: نظراً لقيود حماية وعزل المتصفحات (Sandbox Iframe)، تحجب أنظمة التشغيل بعض التفاصيل الخاصة بالمعالج وكرت الشاشة الفعلي. إذا لم يتطابق الفحص كلياً، يمكنك اختيار معالجك وكرتك وجميع المكونات يدوياً بالأسفل بدقة مطلقة وحرية كاملة." 
+                      : "Scan Precision Note: Due to browser security restrictions and cross-site sandboxes (Sandbox Iframe), specific OS kernels and direct GPU names are masked. You can change any detected specification manually below with absolute ease."}
+                  </span>
+                </div>
               </div>
               {deviceType === "desktop" && (
                 <div className="flex flex-col gap-4">
@@ -1884,39 +1985,56 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
                           </select>
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-mono text-cyan-305/85">جيل ذاكرة الـ RAM (RAM Generation)</label>
+                          <label className="text-[10px] font-mono text-cyan-400">جيل وحجم/نوع ذاكرة الـ RAM (RAM Type & Gen)</label>
                           <select value={ramGen} onChange={(e) => setRamGen(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                            <option value="DDR5">DDR5 (High Bandwidth / Modern)</option>
-                            <option value="DDR4">DDR4 (Standard mainstream)</option>
-                            <option value="DDR3">DDR3 (Legacy)</option>
-                            <option value="DDR2">DDR2 (Vintage)</option>
-                            <option value="DDR1">DDR1 (Retro)</option>
-                            <option value="SDRAM">SDRAM (Classic legacy)</option>
+                            <optgroup label="ذاكرة الأجهزة المحمولة واللابتوب (Laptops & Mobiles)">
+                              <option value="LPDDR5X (High Bandwidth Laptop RAM)">LPDDR5X (Low Power / High Speed Laptop)</option>
+                              <option value="LPDDR5 (Standard Laptop RAM)">LPDDR5 (Efficient Slim Laptop)</option>
+                              <option value="LPDDR4X (Optimized Laptop RAM)">LPDDR4X (Low Power Mainstream)</option>
+                              <option value="LPDDR4 (Standard Laptop RAM)">LPDDR4 (Standard Mobile/Laptop)</option>
+                              <option value="LPDDR3 (Legacy Laptop Memory)">LPDDR3 (Legacy Low Power)</option>
+                              <option value="SODIMM DDR5 (High-Speed Laptop Module)">SODIMM DDR5 (Modular Laptop Standard)</option>
+                              <option value="SODIMM DDR4 (Mainstream Laptop Module)">SODIMM DDR4 (Modular Laptop Standard)</option>
+                              <option value="SODIMM DDR3L (Low-Voltage Module)">SODIMM DDR3L (Low-Voltage Legacy)</option>
+                              <option value="Unified Memory (Apple Apple Silicon)">Unified Memory (M-Series Mac Core)</option>
+                            </optgroup>
+                            <optgroup label="ذاكرة الحواسيب المكتبية (Standard Desktop)">
+                              <option value="DDR5">DDR5 (Max Performance Desktop)</option>
+                              <option value="DDR4">DDR4 (Aesthetic Desktop Mainstream)</option>
+                              <option value="DDR3">DDR3 (Standard Legacy Desktop)</option>
+                              <option value="DDR2">DDR2 (Vintage Standard)</option>
+                              <option value="DDR1">DDR1 (Retro Hardware Core)</option>
+                              <option value="SDRAM">SDRAM (Classic Legacy System)</option>
+                            </optgroup>
                           </select>
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-mono text-cyan-300/80">نظام التشغيل (Operating System)</label>
+                          <label className="text-[10px] font-mono text-cyan-300/85">نظام التشغيل (Operating System)</label>
                           <select value={osName} onChange={(e) => setOsName(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-200 w-full">
-                            <optgroup label="Microsoft Windows">
-                              <option value="Windows 11">Windows 11</option>
-                              <option value="Windows 10">Windows 10</option>
-                              <option value="Windows 8.1">Windows 8.1</option>
-                              <option value="Windows 8">Windows 8</option>
-                              <option value="Windows 7">Windows 7</option>
-                              <option value="Windows XP">Windows XP</option>
-                              <option value="Windows 98">Windows 98</option>
+                            <optgroup label="Microsoft Windows (Flavors & Editions)">
+                              <option value="Windows 11 Pro">Windows 11 Pro (Full Desktop/Laptop)</option>
+                              <option value="Windows 11 Home">Windows 11 Home (Optimized Laptop OS)</option>
+                              <option value="Windows 11 Enterprise">Windows 11 Enterprise (Workstations)</option>
+                              <option value="Windows 10 Pro">Windows 10 Pro (Mainstream Gaming)</option>
+                              <option value="Windows 10 Home">Windows 10 Home (Optimized Laptop OS)</option>
+                              <option value="Windows 8.1 / 8">Windows 8.1 / 8</option>
+                              <option value="Windows 7 Ultimate">Windows 7 Ultimate</option>
+                              <option value="Windows XP Professional">Windows XP Professional</option>
+                              <option value="Windows 98 Second Edition">Windows 98 Second Edition</option>
                             </optgroup>
-                            <optgroup label="Apple macOS">
-                              <option value="macOS Sequoia">macOS Sequoia (Modern)</option>
-                              <option value="macOS Sonoma">macOS Sonoma</option>
-                              <option value="macOS Ventura">macOS Ventura</option>
-                              <option value="macOS Monterey">macOS Monterey</option>
-                              <option value="OS X El Capitan">OS X El Capitan</option>
-                              <option value="OS X Yosemite">OS X Yosemite</option>
-                              <option value="Mac OS X Snow Leopard">Mac OS X Snow Leopard</option>
-                              <option value="Mac OS 9 (Classic PowerPC OS)">Mac OS 9 (Classic PowerPC OS)</option>
+                            <optgroup label="Apple macOS (System editions)">
+                              <option value="macOS Sequoia 15.x">macOS Sequoia 15.x (Latest)</option>
+                              <option value="macOS Sonoma 14.x">macOS Sonoma 14.x</option>
+                              <option value="macOS Ventura 13.x">macOS Ventura 13.x</option>
+                              <option value="macOS Monterey 12.x">macOS Monterey 12.x</option>
+                              <option value="OS X El Capitan 10.11">OS X El Capitan 10.11</option>
+                              <option value="OS X Yosemite 10.10">OS X Yosemite 10.10</option>
+                              <option value="Mac OS X Snow Leopard 10.6">Mac OS X Snow Leopard 10.6</option>
+                              <option value="Mac OS 9 (Classic PowerPC)">Mac OS 9 (Classic PowerPC)</option>
                             </optgroup>
-                            <optgroup label="Open-Source Linux">
+                            <optgroup label="Steam & Custom Linux distros">
+                              <option value="SteamOS (Steam Deck / Handheld Console)">SteamOS (Linux-based Gaming OS)</option>
+                              <option value="ChromeOS (Chromebook laptop)">ChromeOS (Lightweight Cloud OS)</option>
                               <option value="Linux">Linux (توزيعة مخصصة)</option>
                             </optgroup>
                           </select>
@@ -2007,18 +2125,64 @@ You MUST start section names with "## Summary", "## Best Settings" and "## Detai
 
               {/* Dedicated home console selectors */}
               {deviceType === "console" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5 animate-fade-in text-right">
-                    <label className="text-[10px] font-mono text-cyan-400">{t.brandLabel}</label>
-                    <select value={consoleBrand} onChange={(e) => { setConsoleBrand(e.target.value); const models = CONSOLE_MODELS[e.target.value] || []; if (models.length > 0) setConsoleModel(models[0]); }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                      {CONSOLE_BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5 animate-fade-in text-right">
+                      <label className="text-[10px] font-mono text-cyan-400">{t.brandLabel}</label>
+                      <select value={consoleBrand} onChange={(e) => { setConsoleBrand(e.target.value); const models = CONSOLE_MODELS[e.target.value] || []; if (models.length > 0) { setConsoleModel(models[0]); updateConsoleDefaults(models[0]); } }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                        {CONSOLE_BRANDS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1.5 animate-fade-in text-right">
+                      <label className="text-[10px] font-mono text-cyan-400">{t.modelLabel}</label>
+                      <select value={consoleModel} onChange={(e) => { setConsoleModel(e.target.value); updateConsoleDefaults(e.target.value); }} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                        {(CONSOLE_MODELS[consoleBrand] || []).map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 animate-fade-in text-right">
-                    <label className="text-[10px] font-mono text-cyan-400">{t.modelLabel}</label>
-                    <select value={consoleModel} onChange={(e) => setConsoleModel(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
-                      {(CONSOLE_MODELS[consoleBrand] || []).map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                  
+                  {/* Console RAM Type and OS selectors */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#070b14] p-3.5 rounded-xl border border-cyan-950/40 mt-1">
+                    <div className="flex flex-col gap-1.5 text-right animate-fade-in">
+                      <label className="text-[10px] font-mono text-cyan-400">نوع وهندسة الرام للكونسول (Console RAM Type)</label>
+                      <select value={consoleRamGen} onChange={(e) => setConsoleRamGen(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                        <option value="GDDR6 (Modern Unified System RAM)">GDDR6 (Modern Unified System RAM)</option>
+                        <option value="GDDR6 (16GB Unified) + 2GB DDR4 (Background OS)">GDDR6 (High Bandwidth) + 2GB DDR4</option>
+                        <option value="GDDR5 (Unified) + 1GB DDR3 (Background RAM)">GDDR5 (Split Bus) + 1GB DDR3</option>
+                        <option value="Unified GDDR5 RAM">Unified GDDR5 RAM</option>
+                        <option value="DDR3 (Unified RAM) + 32MB eSRAM Cache">DDR3 + 32MB eSRAM Cache</option>
+                        <option value="DDR3 (Unified MEM2 RAM)">DDR3 (Unified MEM2 RAM)</option>
+                        <option value="LPDDR4 (Shared System / Graphics Memory)">LPDDR4 (High Bandwidth Mobile)</option>
+                        <option value="256MB XDR System RAM + 256MB GDDR3 VRAM">XDR System Memory + GDDR3 VRAM</option>
+                        <option value="GDDR3 (Unified System Memory)">GDDR3 (Unified System Memory)</option>
+                        <option value="Direct RDRAM (Rambus System Memory)">Direct RDRAM (Rambus System Memory)</option>
+                        <option value="System RAM (EDO DRAM)">System RAM (EDO DRAM)</option>
+                        <option value="1T-SRAM System Memory">1T-SRAM System Memory</option>
+                        <option value="Rambus RDRAM (High-bandwidth)">Rambus RDRAM (High-bandwidth)</option>
+                        <option value="DRAM System Memory">DRAM System Memory</option>
+                      </select>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1.5 text-right animate-fade-in">
+                      <label className="text-[10px] font-mono text-cyan-400">نظام التشغيل للكونسول (Console Operating System)</label>
+                      <select value={consoleOS} onChange={(e) => setConsoleOS(e.target.value)} className="bg-gray-950 border border-gray-850 p-3 rounded-xl text-xs text-right cursor-pointer text-gray-300 w-full">
+                        <option value="PlayStation 5 System Software">PlayStation 5 System Software</option>
+                        <option value="PlayStation 5 System Software (Firmware 10.x+)">PlayStation 5 System Software (Firmware 10.x+)</option>
+                        <option value="PlayStation 4 Orbis OS">PlayStation 4 Orbis OS</option>
+                        <option value="PlayStation 4 Orbis OS (FreeBSD Custom kernel)">PlayStation 4 Orbis OS (FreeBSD Custom kernel)</option>
+                        <option value="Xbox Series OS (Xbox System Software)">Xbox Series OS (Xbox System Software)</option>
+                        <option value="Xbox One OS (Microsoft Hyper-V dual OS)">Xbox One OS (Microsoft Hyper-V dual OS)</option>
+                        <option value="Nintendo Horizon OS (Custom FreeBSD kernel)">Nintendo Horizon OS (Custom FreeBSD kernel)</option>
+                        <option value="Wii U Menu (Cafe OS)">Wii U Menu (Cafe OS)</option>
+                        <option value="Xbox 360 Dashboard OS (Yaris Core)">Xbox 360 Dashboard OS (Yaris Core)</option>
+                        <option value="PS3 Cell OS (XMB - XrossMediaBar)">PS3 Cell OS (XMB - XrossMediaBar)</option>
+                        <option value="PlayStation 2 Boot ROM OS">PlayStation 2 Boot ROM OS</option>
+                        <option value="Sega Katana OS / Windows CE">Sega Katana OS / Windows CE</option>
+                        <option value="Sega Saturn Real-time BIOS">Sega Saturn Real-time BIOS</option>
+                        <option value="Custom JTAG/RGH Console Dashboard">Custom JTAG / RGH Console Dashboard</option>
+                        <option value="Custom Homebrew / DevKit SDK">Custom Homebrew / DevKit SDK</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}
